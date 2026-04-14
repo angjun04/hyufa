@@ -2,7 +2,7 @@
 
 import TierBadge from "./TierBadge";
 import PositionBadge from "./PositionBadge";
-import { formatTier, getTierScore } from "@/lib/tierScore";
+import { formatTier, getTierScore, POSITIONS } from "@/lib/tierScore";
 import type { UserProfile } from "@/lib/types";
 
 interface PlayerCardProps {
@@ -18,25 +18,16 @@ export default function PlayerCard({
 }: PlayerCardProps) {
   const peakS15 = formatTier(player.peakTierS15, player.peakRankS15);
   const peakS16 = formatTier(player.peakTierS16, player.peakRankS16);
-  const score = getTierScore(
-    player.currentTier || "UNRANKED",
-    player.currentRank || ""
-  );
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-blue-500/50 transition-all">
       <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="text-white font-bold text-lg">
-            {player.gameName}
-            <span className="text-gray-400 font-normal text-sm">
-              #{player.tagLine}
-            </span>
-          </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            팀 포인트: <span className="text-yellow-400 font-semibold">{score}점</span>
-          </p>
-        </div>
+        <h3 className="text-white font-bold text-lg">
+          {player.gameName}
+          <span className="text-gray-400 font-normal text-sm">
+            #{player.tagLine}
+          </span>
+        </h3>
       </div>
 
       <div className="space-y-2 mb-4">
@@ -63,11 +54,31 @@ export default function PlayerCard({
         )}
       </div>
 
+      {/* 포지션별 점수 */}
       {player.preferredPositions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {player.preferredPositions.map((pos) => (
-            <PositionBadge key={pos} position={pos} />
-          ))}
+        <div className="mb-3">
+          <div className="flex flex-wrap gap-2">
+            {player.preferredPositions.map((pos) => {
+              const posInfo = POSITIONS.find((p) => p.value === pos);
+              const score = getTierScore(
+                player.currentTier || "UNRANKED",
+                player.currentRank || "",
+                pos
+              );
+              return (
+                <div
+                  key={pos}
+                  className="flex items-center gap-1.5 bg-gray-700/70 rounded-lg px-2.5 py-1.5"
+                >
+                  <span className="text-sm">{posInfo?.icon}</span>
+                  <span className="text-xs text-gray-300">{posInfo?.label}</span>
+                  <span className="text-xs text-yellow-400 font-bold ml-1">
+                    {score}점
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
