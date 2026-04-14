@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:namu.wiki)",
+      "WebFetch(domain:www.fmkorea.com)",
+      "WebFetch(domain:kai-world.net)",
+      "Bash(npx create-next-app@latest:*)"
+    ]
+  }
+}
