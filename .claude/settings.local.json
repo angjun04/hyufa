@@ -5,7 +5,13 @@
       "WebFetch(domain:namu.wiki)",
       "WebFetch(domain:www.fmkorea.com)",
       "WebFetch(domain:kai-world.net)",
-      "Bash(npx create-next-app@latest:*)"
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm run:*)",
+      "Bash(npx vercel:*)",
+      "Bash(gh auth:*)",
+      "Bash(git add:*)"
     ]
   }
 }

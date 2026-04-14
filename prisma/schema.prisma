@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  password           String
+  gameName           String
+  tagLine            String
+  puuid              String?  @unique
+  summonerId         String?
+  currentTier        String?
+  currentRank        String?
+  currentLP          Int?
+  peakTierS15        String?
+  peakRankS15        String?
+  peakTierS16        String?
+  peakRankS16        String?
+  preferredPositions String[] @default([])
+  bio                String?
+  isLookingForTeam   Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  teamPosts        TeamPost[]
+  sentContacts     ContactRequest[] @relation("SentContacts")
+  receivedContacts ContactRequest[] @relation("ReceivedContacts")
+  messages         Message[]
+
+  @@unique([gameName, tagLine])
+}
+
+model TeamPost {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  positions   String[] @default([])
+  maxTier     String?
+  minTier     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contacts ContactRequest[]
+}
+
+model ContactRequest {
+  id         String    @id @default(cuid())
+  fromUserId String
+  fromUser   User      @relation("SentContacts", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User      @relation("ReceivedContacts", fields: [toUserId], references: [id], onDelete: Cascade)
+  teamPostId String?
+  teamPost   TeamPost? @relation(fields: [teamPostId], references: [id], onDelete: SetNull)
+  type       String
+  status     String    @default("pending")
+  createdAt  DateTime  @default(now())
+
+  messages Message[]
+}
+
+model Message {
+  id        String         @id @default(cuid())
+  contactId String
+  contact   ContactRequest @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User           @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime       @default(now())
+}

@@ -1,0 +1,403 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import TierBadge from "@/components/TierBadge";
+import { POSITIONS, TIERS, DIVISIONS, TIER_LABELS } from "@/lib/tierScore";
+import type { UserProfile, ContactRequestData } from "@/lib/types";
+
+export default function MyPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [contacts, setContacts] = useState<ContactRequestData[]>([]);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({
+    preferredPositions: [] as string[],
+    bio: "",
+    isLookingForTeam: false,
+    peakTierS15: "",
+    peakRankS15: "",
+  });
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/login");
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    if (session?.user) {
+      fetch("/api/profile")
+        .then((r) => r.json())
+        .then((data) => {
+          setProfile(data);
+          setEditForm({
+            preferredPositions: data.preferredPositions || [],
+            bio: data.bio || "",
+            isLookingForTeam: data.isLookingForTeam || false,
+            peakTierS15: data.peakTierS15 || "",
+            peakRankS15: data.peakRankS15 || "",
+          });
+        });
+      fetch("/api/contact")
+        .then((r) => r.json())
+        .then(setContacts);
+    }
+  }, [session]);
+
+  const handleRefreshTier = async () => {
+    setRefreshing(true);
+    const res = await fetch("/api/profile", { method: "PUT" });
+    if (res.ok) {
+      const data = await res.json();
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentTier: data.currentTier,
+              currentRank: data.currentRank,
+              currentLP: data.currentLP,
+            }
+          : prev
+      );
+    } else {
+      const err = await res.json();
+      alert(err.error || "갱신 실패");
+    }
+    setRefreshing(false);
+  };
+
+  const handleSaveProfile = async () => {
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setProfile((prev) => (prev ? { ...prev, ...updated } : prev));
+      setEditMode(false);
+    }
+  };
+
+  const handleContactAction = async (contactId: string, action: string) => {
+    const res = await fetch(`/api/contact/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: action }),
+    });
+    if (res.ok) {
+      setContacts((prev) =>
+        prev.map((c) => (c.id === contactId ? { ...c, status: action } : c))
+      );
+    }
+  };
+
+  const isHighTier = (tier: string) =>
+    tier === "MASTER" || tier === "GRANDMASTER" || tier === "CHALLENGER";
+
+  if (status === "loading" || !profile) {
+    return (
+      <div className="text-center py-20 text-gray-500">불러오는 중...</div>
+    );
+  }
+
+  const received = contacts.filter((c) => c.toUserId === session?.user?.id);
+  const sent = contacts.filter((c) => c.fromUserId === session?.user?.id);
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      {/* Profile Section */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              {profile.gameName}
+              <span className="text-gray-400 font-normal">
+                #{profile.tagLine}
+              </span>
+            </h1>
+            <p className="text-gray-500 text-sm">{profile.email}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRefreshTier}
+              disabled={refreshing}
+              className="text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+            >
+              {refreshing ? "갱신 중..." : "티어 갱신"}
+            </button>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition"
+            >
+              {editMode ? "취소" : "수정"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <span className="text-xs text-gray-500">S16 현재 티어</span>
+            <div className="mt-1">
+              <TierBadge
+                tier={profile.currentTier}
+                rank={profile.currentRank}
+                lp={profile.currentLP}
+              />
+            </div>
+          </div>
+          <div>
+            <span className="text-xs text-gray-500">S15 최고 티어</span>
+            <div className="mt-1">
+              <TierBadge tier={profile.peakTierS15} rank={profile.peakRankS15} />
+            </div>
+          </div>
+        </div>
+
+        {editMode ? (
+          <div className="space-y-4 mt-6 border-t border-gray-700 pt-4">
+            {/* Toggle FA */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editForm.isLookingForTeam}
+                onChange={(e) =>
+                  setEditForm({
+                    ...editForm,
+                    isLookingForTeam: e.target.checked,
+                  })
+                }
+                className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-300">
+                FA 마켓에 등록 (팀 찾는 중)
+              </span>
+            </label>
+
+            {/* Peak Tier */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                S15 최고 티어
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={editForm.peakTierS15}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      peakTierS15: e.target.value,
+                      peakRankS15: isHighTier(e.target.value)
+                        ? "I"
+                        : editForm.peakRankS15,
+                    })
+                  }
+                  className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                >
+                  <option value="">선택 안 함</option>
+                  {TIERS.map((t) => (
+                    <option key={t} value={t}>
+                      {TIER_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+                {editForm.peakTierS15 &&
+                  !isHighTier(editForm.peakTierS15) && (
+                    <select
+                      value={editForm.peakRankS15}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          peakRankS15: e.target.value,
+                        })
+                      }
+                      className="w-20 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">단계</option>
+                      {DIVISIONS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+              </div>
+            </div>
+
+            {/* Positions */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">
+                선호 포지션
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {POSITIONS.map((pos) => (
+                  <button
+                    key={pos.value}
+                    type="button"
+                    onClick={() =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        preferredPositions:
+                          prev.preferredPositions.includes(pos.value)
+                            ? prev.preferredPositions.filter(
+                                (p) => p !== pos.value
+                              )
+                            : [...prev.preferredPositions, pos.value],
+                      }))
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-sm transition ${
+                      editForm.preferredPositions.includes(pos.value)
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-700 text-gray-300"
+                    }`}
+                  >
+                    {pos.icon} {pos.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bio */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">소개</label>
+              <textarea
+                value={editForm.bio}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, bio: e.target.value })
+                }
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white resize-none"
+                rows={3}
+                maxLength={200}
+              />
+            </div>
+
+            <button
+              onClick={handleSaveProfile}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
+            >
+              저장
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4">
+            {profile.isLookingForTeam && (
+              <span className="inline-block bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded-full mb-2">
+                FA 등록 중
+              </span>
+            )}
+            {profile.bio && (
+              <p className="text-gray-400 text-sm">{profile.bio}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Contacts Section */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+        <h2 className="text-lg font-bold mb-4">받은 컨택</h2>
+        {received.length === 0 ? (
+          <p className="text-gray-500 text-sm">받은 컨택이 없습니다.</p>
+        ) : (
+          <div className="space-y-3">
+            {received.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between bg-gray-900/50 rounded-lg p-3"
+              >
+                <div>
+                  <span className="text-white font-medium">
+                    {c.fromUser.gameName}
+                    <span className="text-gray-500">
+                      #{c.fromUser.tagLine}
+                    </span>
+                  </span>
+                  <span className="text-gray-500 text-xs ml-2">
+                    {c.type === "fa_contact" ? "FA 컨택" : "팀 참가 신청"}
+                  </span>
+                  {c.teamPost && (
+                    <span className="text-gray-500 text-xs ml-1">
+                      ({c.teamPost.title})
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {c.status === "pending" ? (
+                    <>
+                      <button
+                        onClick={() => handleContactAction(c.id, "accepted")}
+                        className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition"
+                      >
+                        수락
+                      </button>
+                      <button
+                        onClick={() => handleContactAction(c.id, "rejected")}
+                        className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg transition"
+                      >
+                        거절
+                      </button>
+                    </>
+                  ) : c.status === "accepted" ? (
+                    <Link
+                      href={`/chat/${c.id}`}
+                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition"
+                    >
+                      채팅
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-gray-500">거절됨</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+        <h2 className="text-lg font-bold mb-4">보낸 컨택</h2>
+        {sent.length === 0 ? (
+          <p className="text-gray-500 text-sm">보낸 컨택이 없습니다.</p>
+        ) : (
+          <div className="space-y-3">
+            {sent.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between bg-gray-900/50 rounded-lg p-3"
+              >
+                <div>
+                  <span className="text-white font-medium">
+                    {c.toUser.gameName}
+                    <span className="text-gray-500">#{c.toUser.tagLine}</span>
+                  </span>
+                  <span className="text-gray-500 text-xs ml-2">
+                    {c.type === "fa_contact" ? "FA 컨택" : "팀 참가 신청"}
+                  </span>
+                </div>
+                <div>
+                  {c.status === "pending" && (
+                    <span className="text-xs text-yellow-400">대기 중</span>
+                  )}
+                  {c.status === "accepted" && (
+                    <Link
+                      href={`/chat/${c.id}`}
+                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition"
+                    >
+                      채팅
+                    </Link>
+                  )}
+                  {c.status === "rejected" && (
+                    <span className="text-xs text-gray-500">거절됨</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
