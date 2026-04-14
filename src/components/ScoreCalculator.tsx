@@ -34,9 +34,13 @@ export default function ScoreCalculator() {
     setPlayers(updated);
   };
 
-  const scores = players.map((p) =>
-    p.tier && p.rank ? getTierScore(p.tier, p.rank, p.position) : 0
-  );
+  const scores = players.map((p) => {
+    if (!p.tier) return 0;
+    if (p.tier === "SILVER_BELOW" || p.tier === "DIAMOND_ABOVE")
+      return getTierScore(p.tier, "", p.position);
+    if (!p.rank) return 0;
+    return getTierScore(p.tier, p.rank, p.position);
+  });
   const totalScore = scores.reduce((a, b) => a + b, 0);
   const remaining = TEAM_POINT_CAP - totalScore;
   const isOverCap = remaining < 0;
