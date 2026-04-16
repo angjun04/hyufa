@@ -144,22 +144,22 @@ export default function RegisterPage() {
 
         <div>
           <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">라이엇 ID</label>
-          <div className="flex gap-1.5">
+          <div className="grid grid-cols-[1fr_auto_88px] gap-1.5 items-center">
             <input
               type="text"
               value={form.gameName}
               onChange={(e) => setForm({ ...form, gameName: e.target.value })}
               required
-              className={`flex-1 ${inputCls}`}
+              className={`min-w-0 w-full ${inputCls}`}
               placeholder="소환사명"
             />
-            <span className="self-center text-[#6c727f]">#</span>
+            <span className="text-[#6c727f]">#</span>
             <input
               type="text"
               value={form.tagLine}
               onChange={(e) => setForm({ ...form, tagLine: e.target.value })}
               required
-              className={`w-20 ${inputCls}`}
+              className={`w-full ${inputCls}`}
               placeholder="KR1"
             />
           </div>

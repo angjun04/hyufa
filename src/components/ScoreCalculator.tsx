@@ -237,22 +237,23 @@ export default function ScoreCalculator() {
           const posInfo = POSITIONS.find((p) => p.value === player.position);
           const result = results[i];
           return (
-            <div key={i} className="px-3 py-2.5 hover:bg-[#1a1e25]/40">
-              <div className="flex items-center gap-2">
+            <div key={i} className="px-3 py-2.5 hover:bg-[#1a1e25]/40 overflow-hidden">
+              <div className="flex items-center gap-2 min-w-0">
                 {/* Position */}
-                <div className="w-12 shrink-0 flex flex-col items-center">
+                <div className="w-9 shrink-0 flex flex-col items-center">
                   <span className="text-base leading-none">{posInfo?.icon}</span>
                   <span className="text-[10px] text-[#6c727f] mt-0.5">
                     {posInfo?.label}
                   </span>
                 </div>
 
-                {/* Mode toggle */}
-                <div className="flex shrink-0 rounded overflow-hidden border border-[#232830]">
+                {/* Mode toggle (아이콘만) */}
+                <div className="flex shrink-0 flex-col rounded overflow-hidden border border-[#232830]">
                   <button
                     type="button"
                     onClick={() => switchMode(i, "tier")}
-                    className={`text-[10px] px-1.5 py-0.5 ${
+                    title="티어 직접 선택"
+                    className={`text-[9px] px-1 py-0.5 ${
                       player.mode === "tier"
                         ? "bg-[#e08a3c] text-black font-semibold"
                         : "text-[#6c727f] hover:text-white"
@@ -263,13 +264,14 @@ export default function ScoreCalculator() {
                   <button
                     type="button"
                     onClick={() => switchMode(i, "nickname")}
-                    className={`text-[10px] px-1.5 py-0.5 border-l border-[#232830] ${
+                    title="닉네임 자동 조회"
+                    className={`text-[9px] px-1 py-0.5 border-t border-[#232830] ${
                       player.mode === "nickname"
                         ? "bg-[#e08a3c] text-black font-semibold"
                         : "text-[#6c727f] hover:text-white"
                     }`}
                   >
-                    닉네임
+                    닉넴
                   </button>
                 </div>
 
@@ -325,27 +327,26 @@ export default function ScoreCalculator() {
                     />
                   </>
                 ) : (
-                  <div className="flex-1 flex gap-1 min-w-0">
+                  <div className="flex-1 grid grid-cols-[minmax(0,1fr)_48px_auto] gap-1 items-center min-w-0">
                     <input
                       type="text"
                       value={player.gameName}
                       onChange={(e) => updatePlayer(i, "gameName", e.target.value)}
                       placeholder="닉네임"
-                      className={`flex-1 min-w-0 ${inputCls}`}
+                      className={`min-w-0 w-full ${inputCls}`}
                     />
-                    <span className="self-center text-[#6c727f] text-xs">#</span>
                     <input
                       type="text"
                       value={player.tagLine}
                       onChange={(e) => updatePlayer(i, "tagLine", e.target.value)}
-                      placeholder="KR1"
-                      className={`w-12 ${inputCls}`}
+                      placeholder="#KR1"
+                      className={`w-full ${inputCls}`}
                     />
                     <button
                       type="button"
                       onClick={() => lookupNickname(i)}
                       disabled={player.lookupLoading}
-                      className="text-[11px] bg-[#e08a3c] hover:bg-[#f09a48] disabled:opacity-50 text-black font-semibold px-2 rounded"
+                      className="text-[11px] bg-[#e08a3c] hover:bg-[#f09a48] disabled:opacity-50 text-black font-semibold px-2 py-1.5 rounded"
                     >
                       {player.lookupLoading ? "…" : "조회"}
                     </button>
