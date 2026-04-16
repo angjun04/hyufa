@@ -82,23 +82,39 @@ function extractSid(html: string): string | null {
   return m?.[1] ?? null;
 }
 
+interface ParsedGame {
+  date: Date;
+  isRemake: boolean; // 다시하기 (remake) — 솔로랭크 통계에서 제외해야 함
+}
+
 /**
- * 페이지 HTML에서 game 날짜를 timestamp 형식으로 추출.
- * fow의 game_summary 안에는 tipsy='YYYY. MM. DD. ...' 형식의 날짜가 있다.
+ * 페이지 HTML을 게임 카드 단위로 분리해 각 카드의 날짜와 다시하기 여부 파싱.
+ * 각 게임 카드 끝에는 `showGameDetailBtn ... data-game-id="..."` 가 있어
+ * 이 패턴 기준으로 카드를 split.
  */
-function parseGameDates(html: string): Date[] {
-  const dates: Date[] = [];
-  const re = /tipsy='(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./g;
+function parseGames(html: string): ParsedGame[] {
+  const games: ParsedGame[] = [];
+  const re = /showGameDetailBtn[^<]*?data-game-id=["']\d+["']/g;
+  let prevPos = 0;
   let m;
   while ((m = re.exec(html)) !== null) {
-    const y = parseInt(m[1], 10);
-    const mo = parseInt(m[2], 10);
-    const d = parseInt(m[3], 10);
-    if (Number.isFinite(y) && Number.isFinite(mo) && Number.isFinite(d)) {
-      dates.push(new Date(y, mo - 1, d));
-    }
+    const card = html.substring(prevPos, m.index + m[0].length);
+    prevPos = m.index + m[0].length;
+    const dateM = card.match(
+      /tipsy='(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/
+    );
+    if (!dateM) continue;
+    const y = parseInt(dateM[1], 10);
+    const mo = parseInt(dateM[2], 10);
+    const d = parseInt(dateM[3], 10);
+    if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d))
+      continue;
+    games.push({
+      date: new Date(y, mo - 1, d),
+      isRemake: card.includes("다시하기"),
+    });
   }
-  return dates;
+  return games;
 }
 
 /**
@@ -119,16 +135,16 @@ async function countS15SoloGames(sid: string): Promise<number | null> {
     }
     pageCount++;
 
-    const dates = parseGameDates(html);
-    if (dates.length === 0) break;
+    const games = parseGames(html);
+    if (games.length === 0) break;
 
-    // S15 범위 카운트
-    for (const d of dates) {
-      if (d >= S15_START && d < S15_END) s15Count++;
+    // S15 범위 + 다시하기 제외 카운트
+    for (const g of games) {
+      if (g.date >= S15_START && g.date < S15_END && !g.isRemake) s15Count++;
     }
 
     // 가장 오래된 게임이 S15 이전이면 중단
-    const oldest = dates[dates.length - 1];
+    const oldest = games[games.length - 1].date;
     if (oldest < S15_START) break;
 
     // 다음 페이지 cursor
