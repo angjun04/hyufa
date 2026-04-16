@@ -1,17 +1,16 @@
-// fow.lol 크롤러 — S15(2025) peak 티어 + 전체 판수 조회
-// 라이엇 공식 API는 종료된 시즌의 peak/판수를 제공하지 않으므로 fow에서 가져온다.
+// fow.lol 크롤러 — S15(2025) peak 티어 + 솔로랭크 판수 조회
 
 import * as cheerio from "cheerio";
 
 export interface FowPeakResult {
-  tier: string | null; // "DIAMOND", "MASTER" 등 (대문자 영문)
-  rank: string | null; // "I", "II", "III", "IV" 또는 null (마스터 이상)
+  tier: string | null;
+  rank: string | null;
   lp: number | null;
 }
 
 export interface FowSummary {
   peak: FowPeakResult;
-  gamesS15: number | null; // fow "챔피언(S15) 전체 사용 챔피언" 합산
+  gamesS15: number | null; // S15 솔로랭크 판수 (자유랭크 / 노말 제외)
 }
 
 const USER_AGENT =
@@ -30,6 +29,14 @@ const VALID_TIERS = new Set([
   "CHALLENGER",
 ]);
 const VALID_RANKS = new Set(["I", "II", "III", "IV"]);
+
+// S15(2025) 시즌 범위 (KST 기준)
+// 시작: 2025-01-08, 종료: 2025-12-31 (S16은 2026 시작)
+const S15_START = new Date("2025-01-08T00:00:00+09:00");
+const S15_END = new Date("2026-01-01T00:00:00+09:00");
+
+// 안전장치: 최대 페이지 수 (한 페이지 ~30판이라 12 = 360판까지 커버)
+const MAX_PAGES = 12;
 
 function fetchHtml(url: string): Promise<string | null> {
   return fetch(url, {
@@ -71,36 +78,75 @@ function parsePeakFromHtml(
 }
 
 function extractSid(html: string): string | null {
-  // /api/champstat?sid=12345&region=... 패턴에서 추출
   const m = html.match(/sid=(\d+)/);
   return m?.[1] ?? null;
 }
 
 /**
- * 전체 사용 챔피언 목록(tab=15A)에서 판수 합산.
- * fow의 메인 페이지에는 판수 상위 7개만 있으므로 ajax 엔드포인트 호출 필요.
+ * 페이지 HTML에서 game 날짜를 timestamp 형식으로 추출.
+ * fow의 game_summary 안에는 tipsy='YYYY. MM. DD. ...' 형식의 날짜가 있다.
  */
-async function sumChampGames(sid: string, tab: string): Promise<number | null> {
-  const url = `https://www.fow.lol/api/champstat?sid=${sid}&region=kr&tab=${tab}`;
-  const html = await fetchHtml(url);
-  if (!html) return null;
-
-  const $ = cheerio.load(`<table>${html}</table>`);
-  let total = 0;
-  let any = false;
-  $("tr.champ_stat").each((_, el) => {
-    const tds = $(el).find("td");
-    const games = parseInt(tds.eq(1).text().trim(), 10);
-    if (Number.isFinite(games)) {
-      total += games;
-      any = true;
+function parseGameDates(html: string): Date[] {
+  const dates: Date[] = [];
+  const re = /tipsy='(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./g;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10);
+    const d = parseInt(m[3], 10);
+    if (Number.isFinite(y) && Number.isFinite(mo) && Number.isFinite(d)) {
+      dates.push(new Date(y, mo - 1, d));
     }
-  });
-  return any ? total : 0;
+  }
+  return dates;
 }
 
 /**
- * S15 peak + 전체 판수를 한 번에 반환 (메인 페이지 1회 + ajax 1회).
+ * 솔로랭크 게임 목록을 페이지네이션해 S15 범위 판수 카운트.
+ * fow는 한 페이지 ~30판, get_more_games의 data-ts로 다음 cursor 제공.
+ */
+async function countS15SoloGames(sid: string): Promise<number | null> {
+  let ts: string | null = null;
+  let s15Count = 0;
+  let pageCount = 0;
+
+  while (pageCount < MAX_PAGES) {
+    const url = `https://www.fow.lol/api/games?type=solo&region=kr&sid=${sid}&champ=0${ts ? `&ts=${ts}` : ""}`;
+    const html = await fetchHtml(url);
+    if (!html) {
+      // 한 번도 못 가져왔으면 null, 일부 가져왔으면 그 값 반환
+      return pageCount === 0 ? null : s15Count;
+    }
+    pageCount++;
+
+    const dates = parseGameDates(html);
+    if (dates.length === 0) break;
+
+    // S15 범위 카운트
+    for (const d of dates) {
+      if (d >= S15_START && d < S15_END) s15Count++;
+    }
+
+    // 가장 오래된 게임이 S15 이전이면 중단
+    const oldest = dates[dates.length - 1];
+    if (oldest < S15_START) break;
+
+    // 다음 페이지 cursor
+    const tsMatch = html.match(
+      /get_more_games[^>]*data-ts=['"](\d+)['"]/
+    );
+    if (!tsMatch) break;
+    const newTs = tsMatch[1];
+    if (newTs === ts) break; // 동일 cursor면 무한 루프 방지
+    ts = newTs;
+  }
+
+  return s15Count;
+}
+
+/**
+ * S15 peak + 솔로랭크 판수 조회.
+ * 메인 페이지 1회 + 게임 목록 페이지네이션 (보통 1~5회).
  */
 export async function fetchS15SummaryFromFow(
   gameName: string,
@@ -119,13 +165,13 @@ export async function fetchS15SummaryFromFow(
   const sid = extractSid(html);
   let gamesS15: number | null = null;
   if (sid) {
-    gamesS15 = await sumChampGames(sid, "15A");
+    gamesS15 = await countS15SoloGames(sid);
   }
   return { peak, gamesS15 };
 }
 
 /**
- * 기존 호출부 호환용 — peak만 반환.
+ * 호환용 — peak만.
  */
 export async function fetchPeakFromFow(
   gameName: string,
