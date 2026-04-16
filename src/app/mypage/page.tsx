@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import TierBadge from "@/components/TierBadge";
-import { POSITIONS } from "@/lib/tierScore";
+import { POSITIONS, TIERS, DIVISIONS, TIER_LABELS } from "@/lib/tierScore";
 import type { UserProfile, ContactRequestData } from "@/lib/types";
 
 function formatRelative(iso: string | null): string {
@@ -31,6 +31,8 @@ export default function MyPage() {
     preferredPositions: [] as string[],
     bio: "",
     isLookingForTeam: false,
+    peakTierS15: "",
+    peakRankS15: "",
   });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
@@ -51,6 +53,8 @@ export default function MyPage() {
             preferredPositions: data.preferredPositions || [],
             bio: data.bio || "",
             isLookingForTeam: data.isLookingForTeam || false,
+            peakTierS15: data.peakTierS15 || "",
+            peakRankS15: data.peakRankS15 || "",
           });
         });
       fetch("/api/contact")
@@ -227,6 +231,64 @@ export default function MyPage() {
                 FA 마켓에 등록 (팀 찾는 중)
               </span>
             </label>
+
+            {/* S15 peak — fow.kr에 없으면 수동 입력 */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                S15 최고 티어
+                <span className="ml-2 text-xs text-gray-500">
+                  (fow.kr에 없으면 직접 입력)
+                </span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={editForm.peakTierS15}
+                  onChange={(e) => {
+                    const t = e.target.value;
+                    setEditForm({
+                      ...editForm,
+                      peakTierS15: t,
+                      peakRankS15:
+                        t === "MASTER" ||
+                        t === "GRANDMASTER" ||
+                        t === "CHALLENGER"
+                          ? ""
+                          : editForm.peakRankS15,
+                    });
+                  }}
+                  className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                >
+                  <option value="">기록 없음</option>
+                  {TIERS.map((t) => (
+                    <option key={t} value={t}>
+                      {TIER_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+                {editForm.peakTierS15 &&
+                  !["MASTER", "GRANDMASTER", "CHALLENGER"].includes(
+                    editForm.peakTierS15
+                  ) && (
+                    <select
+                      value={editForm.peakRankS15}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          peakRankS15: e.target.value,
+                        })
+                      }
+                      className="w-24 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">단계</option>
+                      {DIVISIONS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+              </div>
+            </div>
 
             {/* Positions */}
             <div>

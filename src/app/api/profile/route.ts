@@ -62,7 +62,9 @@ export async function GET() {
   });
 }
 
-// 프로필 수정 (티어/peak 관련 필드는 클라이언트가 못 바꿈)
+// 프로필 수정
+// 대부분의 티어 필드는 서버에서 자동 책정. 예외: S15 peak는 fow.kr에 색인 안 된
+// 소환사를 위해 수동 입력을 허용한다 (peakSourceS15="manual"로 표시).
 export async function PATCH(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -70,7 +72,63 @@ export async function PATCH(req: Request) {
   }
 
   const body = await req.json();
-  const { preferredPositions, bio, isLookingForTeam } = body;
+  const {
+    preferredPositions,
+    bio,
+    isLookingForTeam,
+    peakTierS15,
+    peakRankS15,
+  } = body;
+
+  // S15 peak 검증
+  const allowedTiers = [
+    "IRON",
+    "BRONZE",
+    "SILVER",
+    "GOLD",
+    "PLATINUM",
+    "EMERALD",
+    "DIAMOND",
+    "MASTER",
+    "GRANDMASTER",
+    "CHALLENGER",
+  ];
+  const allowedRanks = ["I", "II", "III", "IV"];
+  const highTier = ["MASTER", "GRANDMASTER", "CHALLENGER"];
+
+  const s15Update: {
+    peakTierS15?: string | null;
+    peakRankS15?: string | null;
+    peakSourceS15?: string | null;
+  } = {};
+  if (peakTierS15 !== undefined) {
+    if (peakTierS15 === null || peakTierS15 === "") {
+      s15Update.peakTierS15 = null;
+      s15Update.peakRankS15 = null;
+      s15Update.peakSourceS15 = null;
+    } else {
+      if (!allowedTiers.includes(peakTierS15)) {
+        return NextResponse.json(
+          { error: "올바른 티어가 아닙니다." },
+          { status: 400 }
+        );
+      }
+      if (highTier.includes(peakTierS15)) {
+        s15Update.peakTierS15 = peakTierS15;
+        s15Update.peakRankS15 = null;
+      } else {
+        if (!peakRankS15 || !allowedRanks.includes(peakRankS15)) {
+          return NextResponse.json(
+            { error: "단계(I~IV)를 선택해주세요." },
+            { status: 400 }
+          );
+        }
+        s15Update.peakTierS15 = peakTierS15;
+        s15Update.peakRankS15 = peakRankS15;
+      }
+      s15Update.peakSourceS15 = "manual";
+    }
+  }
 
   const user = await prisma.user.update({
     where: { id: session.user.id },
@@ -78,8 +136,17 @@ export async function PATCH(req: Request) {
       ...(preferredPositions !== undefined && { preferredPositions }),
       ...(bio !== undefined && { bio }),
       ...(isLookingForTeam !== undefined && { isLookingForTeam }),
+      ...s15Update,
     },
-    select: { id: true, preferredPositions: true, bio: true, isLookingForTeam: true },
+    select: {
+      id: true,
+      preferredPositions: true,
+      bio: true,
+      isLookingForTeam: true,
+      peakTierS15: true,
+      peakRankS15: true,
+      peakSourceS15: true,
+    },
   });
 
   return NextResponse.json(user);
