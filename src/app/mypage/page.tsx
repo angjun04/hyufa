@@ -17,9 +17,11 @@ function formatRelative(iso: string | null): string {
   if (min < 60) return `${min}분 전`;
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}시간 전`;
-  const day = Math.floor(hr / 24);
-  return `${day}일 전`;
+  return `${Math.floor(hr / 24)}일 전`;
 }
+
+const inputCls =
+  "bg-[#0b0d11] border border-[#232830] rounded px-3 py-2 text-[13px] text-white focus:border-[#e08a3c] focus:outline-none";
 
 export default function MyPage() {
   const { data: session, status } = useSession();
@@ -40,31 +42,46 @@ export default function MyPage() {
   const [faToggling, setFaToggling] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/login");
-    }
+    if (status === "unauthenticated") router.push("/auth/login");
   }, [status, router]);
 
   useEffect(() => {
     if (session?.user) {
-      fetch("/api/profile")
-        .then((r) => r.json())
-        .then((data: UserProfile) => {
-          setProfile(data);
-          setEditForm({
-            preferredPositions: data.preferredPositions || [],
-            bio: data.bio || "",
-            isLookingForTeam: data.isLookingForTeam || false,
-            peakTierS15: data.peakTierS15 || "",
-            peakRankS15: data.peakRankS15 || "",
-            gamesS15: data.gamesS15 != null ? String(data.gamesS15) : "",
-          });
+      fetch("/api/profile").then(async (r) => {
+        if (!r.ok) {
+          // 세션은 살아있지만 user 레코드가 없는 경우 (DB 리셋 등) — 강제 로그아웃
+          router.push("/auth/login");
+          return;
+        }
+        const data: UserProfile = await r.json();
+        setProfile(data);
+        setEditForm({
+          preferredPositions: data.preferredPositions || [],
+          bio: data.bio || "",
+          isLookingForTeam: data.isLookingForTeam || false,
+          peakTierS15: data.peakTierS15 || "",
+          peakRankS15: data.peakRankS15 || "",
+          gamesS15: data.gamesS15 != null ? String(data.gamesS15) : "",
         });
-      fetch("/api/contact")
-        .then((r) => r.json())
-        .then(setContacts);
+      });
+      fetch("/api/contact").then((r) => (r.ok ? r.json() : [])).then(setContacts);
     }
-  }, [session]);
+  }, [session, router]);
+
+  const handleToggleFA = async (next: boolean) => {
+    setFaToggling(true);
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isLookingForTeam: next }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setProfile((prev) => (prev ? { ...prev, isLookingForTeam: updated.isLookingForTeam } : prev));
+      setEditForm((prev) => ({ ...prev, isLookingForTeam: updated.isLookingForTeam }));
+    }
+    setFaToggling(false);
+  };
 
   const handleRefreshTier = async () => {
     setRefreshing(true);
@@ -93,26 +110,10 @@ export default function MyPage() {
     setRefreshing(false);
   };
 
-  const handleToggleFA = async (next: boolean) => {
-    setFaToggling(true);
-    const res = await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isLookingForTeam: next }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setProfile((prev) => (prev ? { ...prev, isLookingForTeam: updated.isLookingForTeam } : prev));
-      setEditForm((prev) => ({ ...prev, isLookingForTeam: updated.isLookingForTeam }));
-    }
-    setFaToggling(false);
-  };
-
   const handleSaveProfile = async () => {
     const payload = {
       ...editForm,
-      gamesS15:
-        editForm.gamesS15 === "" ? null : parseInt(editForm.gamesS15, 10),
+      gamesS15: editForm.gamesS15 === "" ? null : parseInt(editForm.gamesS15, 10),
     };
     const res = await fetch("/api/profile", {
       method: "PATCH",
@@ -140,145 +141,167 @@ export default function MyPage() {
   };
 
   if (status === "loading" || !profile) {
-    return (
-      <div className="text-center py-20 text-gray-500">불러오는 중...</div>
-    );
+    return <div className="text-center py-20 text-[#6c727f] text-sm">불러오는 중...</div>;
   }
 
   const received = contacts.filter((c) => c.toUserId === session?.user?.id);
   const sent = contacts.filter((c) => c.fromUserId === session?.user?.id);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-      {/* Profile Section */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+      {/* Profile Header */}
+      <section className="bg-[#14171d] border border-[#232830] rounded-md">
+        <div className="px-4 py-3 flex items-start justify-between border-b border-[#232830]">
+          <div className="min-w-0">
+            <h1 className="text-[18px] font-bold text-white leading-tight">
               {profile.gameName}
-              <span className="text-gray-400 font-normal">
+              <span className="text-[#6c727f] font-normal text-sm ml-0.5">
                 #{profile.tagLine}
               </span>
             </h1>
-            <p className="text-gray-500 text-sm">@{profile.username}</p>
-            {profile.isAdmin && (
-              <Link
-                href="/admin"
-                className="inline-block mt-1 text-xs bg-purple-600/20 text-purple-300 px-2 py-0.5 rounded-full hover:bg-purple-600/30"
-              >
-                어드민 페이지
-              </Link>
-            )}
+            <p className="text-[12px] text-[#6c727f] mt-0.5">
+              @{profile.username}
+              {profile.isAdmin && (
+                <Link
+                  href="/admin"
+                  className="ml-2 text-[#a070d6] hover:underline"
+                >
+                  · 어드민
+                </Link>
+              )}
+            </p>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex gap-2">
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex gap-1.5">
               <button
                 onClick={handleRefreshTier}
                 disabled={refreshing}
-                className="text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-[11px] bg-[#1a1e25] hover:bg-[#232830] border border-[#232830] text-[#a3a8b3] hover:text-white px-2.5 py-1 rounded transition disabled:opacity-50"
               >
-                {refreshing ? "갱신 중..." : "티어 갱신"}
+                {refreshing ? "갱신 중…" : "↻ 티어 갱신"}
               </button>
               <button
                 onClick={() => setEditMode(!editMode)}
-                className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition"
+                className="text-[11px] bg-[#e08a3c] hover:bg-[#f09a48] text-black px-2.5 py-1 rounded font-semibold transition"
               >
                 {editMode ? "취소" : "수정"}
               </button>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-[10px] text-[#6c727f]">
               마지막 갱신: {formatRelative(profile.refreshedAt)}
             </p>
           </div>
         </div>
 
         {refreshError && (
-          <div className="bg-red-500/20 border border-red-500/50 text-red-300 text-xs p-2 rounded-lg mb-3">
+          <div className="mx-4 mt-3 bg-[#e3603f]/10 border border-[#e3603f]/40 text-[#e3603f] text-[12px] p-2 rounded">
             {refreshError}
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-          <div>
-            <span className="text-xs text-gray-500">S16 현재</span>
-            <div className="mt-1">
-              <TierBadge
-                tier={profile.currentTier}
-                rank={profile.currentRank}
-                lp={profile.currentLP}
-              />
-            </div>
-          </div>
-          <div>
-            <span className="text-xs text-gray-500">
-              S16 최고{profile.peakLockedAt ? " (확정)" : " (진행 중)"}
-            </span>
-            <div className="mt-1">
-              <TierBadge tier={profile.peakTierS16} rank={profile.peakRankS16} />
-            </div>
-            {profile.gamesS16 != null && (
-              <p className="text-[10px] text-gray-500 mt-1">
-                {profile.gamesS16}판
+        {/* Tier grid */}
+        <div className="grid grid-cols-3 divide-x divide-[#232830] border-b border-[#232830]">
+          {[
+            {
+              label: "S16 현재",
+              tier: profile.currentTier,
+              rank: profile.currentRank,
+              lp: profile.currentLP,
+              games: profile.gamesS16,
+            },
+            {
+              label: profile.peakLockedAt ? "S16 최고 (확정)" : "S16 최고",
+              tier: profile.peakTierS16,
+              rank: profile.peakRankS16,
+              lp: profile.peakLPS16,
+              games: profile.peakLockedAt ? null : profile.gamesS16,
+              suffix: profile.peakLockedAt ? " · LOCKED" : null,
+            },
+            {
+              label:
+                "S15 최고" +
+                (profile.peakSourceS15 === "fow"
+                  ? " (fow)"
+                  : profile.peakSourceS15 === "manual"
+                    ? " (수동)"
+                    : ""),
+              tier: profile.peakTierS15,
+              rank: profile.peakRankS15,
+              lp: null,
+              games: profile.gamesS15,
+            },
+          ].map((c, i) => (
+            <div key={i} className="px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#6c727f] mb-1.5">
+                {c.label}
               </p>
-            )}
-          </div>
-          <div>
-            <span className="text-xs text-gray-500">
-              S15 최고
-              {profile.peakSourceS15 === "fow"
-                ? " (fow.kr)"
-                : profile.peakSourceS15 === "manual"
-                  ? " (수동)"
-                  : ""}
-            </span>
-            <div className="mt-1">
-              <TierBadge tier={profile.peakTierS15} rank={profile.peakRankS15} />
+              <TierBadge tier={c.tier} rank={c.rank} lp={c.lp} size="md" />
+              {c.games != null && (
+                <p className="text-[10px] text-[#6c727f] mt-1.5 tabular-nums">
+                  {c.games}판
+                </p>
+              )}
             </div>
-            {profile.gamesS15 != null && (
-              <p className="text-[10px] text-gray-500 mt-1">
-                {profile.gamesS15}판
-              </p>
-            )}
-          </div>
+          ))}
         </div>
 
         {profile.peakLockedAt && (
-          <p className="text-xs text-yellow-400 mb-3">
-            ⚠ S16 최고 티어가 확정되었습니다 (
-            {new Date(profile.peakLockedAt).toLocaleString("ko-KR")}). 이후 티어
-            갱신은 현재 티어에만 반영됩니다.
-          </p>
+          <div className="px-4 py-2 text-[11px] text-[#e6b73f] bg-[#e6b73f]/5 border-b border-[#232830]">
+            S16 최고 티어가 확정되었습니다 ({new Date(profile.peakLockedAt).toLocaleString("ko-KR")}). 이후 갱신은 현재 티어에만 반영.
+          </div>
         )}
 
-        {/* FA 마켓 토글 — 항상 노출 (edit mode 무관) */}
-        <label className="flex items-center gap-3 cursor-pointer mb-4 bg-gray-900/50 rounded-lg px-4 py-3 hover:bg-gray-900/70 transition">
+        {/* FA toggle — always visible */}
+        <label className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#1a1e25]/40 transition border-b border-[#232830]">
           <input
             type="checkbox"
             checked={profile.isLookingForTeam || false}
             disabled={faToggling}
             onChange={(e) => handleToggleFA(e.target.checked)}
-            className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500"
+            className="w-4 h-4 accent-[#e08a3c]"
           />
-          <span className="text-sm text-gray-200 font-medium">
-            🎮 FA 마켓에 등록 (팀 찾는 중)
+          <span className="text-[13px] text-[#cdd1d8] font-medium">
+            FA 마켓에 노출
           </span>
           {faToggling && (
-            <span className="text-xs text-gray-500 ml-auto">저장 중...</span>
+            <span className="text-[11px] text-[#6c727f] ml-auto">저장 중…</span>
           )}
           {!faToggling && profile.isLookingForTeam && (
-            <span className="text-xs text-green-400 ml-auto">노출 중</span>
+            <span className="text-[11px] text-[#2bc66c] ml-auto">● 노출 중</span>
+          )}
+          {!faToggling && !profile.isLookingForTeam && (
+            <span className="text-[11px] text-[#6c727f] ml-auto">○ 비공개</span>
           )}
         </label>
 
-        {editMode ? (
-          <div className="space-y-4 mt-6 border-t border-gray-700 pt-4">
-            {/* S15 peak — fow.kr에 없으면 수동 입력 */}
+        {/* Position + bio area */}
+        {!editMode ? (
+          <div className="px-4 py-3">
+            {profile.preferredPositions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {profile.preferredPositions.map((p) => {
+                  const info = POSITIONS.find((x) => x.value === p);
+                  return (
+                    <span
+                      key={p}
+                      className="bg-[#1a1e25] border border-[#232830] text-[#a3a8b3] text-[11px] px-2 py-0.5 rounded"
+                    >
+                      {info?.icon} {info?.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            {profile.bio && (
+              <p className="text-[13px] text-[#cdd1d8] whitespace-pre-wrap">{profile.bio}</p>
+            )}
+          </div>
+        ) : (
+          <div className="px-4 py-3 space-y-4">
+            {/* S15 manual */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1">
-                S15 최고 티어
-                <span className="ml-2 text-xs text-gray-500">
-                  (fow.kr에 없으면 직접 입력)
-                </span>
+              <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">
+                S15 최고 티어 (fow에 없으면 직접 입력)
               </label>
               <div className="flex gap-2">
                 <select
@@ -289,232 +312,175 @@ export default function MyPage() {
                       ...editForm,
                       peakTierS15: t,
                       peakRankS15:
-                        t === "MASTER" ||
-                        t === "GRANDMASTER" ||
-                        t === "CHALLENGER"
+                        t === "MASTER" || t === "GRANDMASTER" || t === "CHALLENGER"
                           ? ""
                           : editForm.peakRankS15,
                     });
                   }}
-                  className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                  className={`flex-1 ${inputCls}`}
                 >
                   <option value="">기록 없음</option>
                   {TIERS.map((t) => (
-                    <option key={t} value={t}>
-                      {TIER_LABELS[t]}
-                    </option>
+                    <option key={t} value={t}>{TIER_LABELS[t]}</option>
                   ))}
                 </select>
                 {editForm.peakTierS15 &&
-                  !["MASTER", "GRANDMASTER", "CHALLENGER"].includes(
-                    editForm.peakTierS15
-                  ) && (
+                  !["MASTER", "GRANDMASTER", "CHALLENGER"].includes(editForm.peakTierS15) && (
                     <select
                       value={editForm.peakRankS15}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          peakRankS15: e.target.value,
-                        })
-                      }
-                      className="w-24 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                      onChange={(e) => setEditForm({ ...editForm, peakRankS15: e.target.value })}
+                      className={`w-20 ${inputCls}`}
                     >
                       <option value="">단계</option>
                       {DIVISIONS.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
+                        <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
                   )}
               </div>
-              <div className="mt-2">
-                <label className="block text-xs text-gray-500 mb-1">
-                  S15 솔로랭크 판수 (fow 자동 값이 틀리면 직접 입력)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={editForm.gamesS15}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, gamesS15: e.target.value })
-                  }
-                  placeholder="예: 50"
-                  className="w-32 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
-                />
-              </div>
+              <input
+                type="number"
+                min={0}
+                value={editForm.gamesS15}
+                onChange={(e) => setEditForm({ ...editForm, gamesS15: e.target.value })}
+                placeholder="S15 판수"
+                className={`w-32 mt-2 ${inputCls}`}
+              />
             </div>
 
             {/* Positions */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
+              <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1.5">
                 선호 포지션
               </label>
-              <div className="flex flex-wrap gap-2">
-                {POSITIONS.map((pos) => (
-                  <button
-                    key={pos.value}
-                    type="button"
-                    onClick={() =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        preferredPositions:
-                          prev.preferredPositions.includes(pos.value)
-                            ? prev.preferredPositions.filter(
-                                (p) => p !== pos.value
-                              )
+              <div className="flex flex-wrap gap-1.5">
+                {POSITIONS.map((pos) => {
+                  const active = editForm.preferredPositions.includes(pos.value);
+                  return (
+                    <button
+                      key={pos.value}
+                      type="button"
+                      onClick={() =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          preferredPositions: active
+                            ? prev.preferredPositions.filter((p) => p !== pos.value)
                             : [...prev.preferredPositions, pos.value],
-                      }))
-                    }
-                    className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                      editForm.preferredPositions.includes(pos.value)
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-700 text-gray-300"
-                    }`}
-                  >
-                    {pos.icon} {pos.label}
-                  </button>
-                ))}
+                        }))
+                      }
+                      className={`px-2.5 py-1 rounded text-[12px] border transition ${
+                        active
+                          ? "bg-[#e08a3c] text-black border-[#e08a3c] font-semibold"
+                          : "bg-[#0b0d11] text-[#a3a8b3] border-[#232830] hover:border-[#3a414c]"
+                      }`}
+                    >
+                      {pos.icon} {pos.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Bio */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1">소개</label>
+              <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">소개</label>
               <textarea
                 value={editForm.bio}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, bio: e.target.value })
-                }
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white resize-none"
+                onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
                 rows={3}
                 maxLength={200}
+                className={`w-full resize-none ${inputCls}`}
               />
             </div>
 
             <button
               onClick={handleSaveProfile}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition"
+              className="bg-[#e08a3c] hover:bg-[#f09a48] text-black px-4 py-2 rounded text-[13px] font-semibold transition"
             >
               저장
             </button>
           </div>
-        ) : (
-          <div className="mt-4">
-            {profile.isLookingForTeam && (
-              <span className="inline-block bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded-full mb-2">
-                FA 등록 중
-              </span>
-            )}
-            {profile.bio && (
-              <p className="text-gray-400 text-sm">{profile.bio}</p>
-            )}
-          </div>
         )}
-      </div>
+      </section>
 
-      {/* Contacts Section */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
-        <h2 className="text-lg font-bold mb-4">받은 컨택</h2>
-        {received.length === 0 ? (
-          <p className="text-gray-500 text-sm">받은 컨택이 없습니다.</p>
-        ) : (
-          <div className="space-y-3">
-            {received.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between bg-gray-900/50 rounded-lg p-3"
-              >
-                <div>
-                  <span className="text-white font-medium">
-                    {c.fromUser.gameName}
-                    <span className="text-gray-500">
-                      #{c.fromUser.tagLine}
-                    </span>
-                  </span>
-                  <span className="text-gray-500 text-xs ml-2">
+      {/* Contacts */}
+      <ContactList title="받은 컨택" items={received} mode="received" onAction={handleContactAction} />
+      <ContactList title="보낸 컨택" items={sent} mode="sent" />
+    </div>
+  );
+}
+
+function ContactList({
+  title,
+  items,
+  mode,
+  onAction,
+}: {
+  title: string;
+  items: ContactRequestData[];
+  mode: "received" | "sent";
+  onAction?: (id: string, action: string) => void;
+}) {
+  return (
+    <section className="bg-[#14171d] border border-[#232830] rounded-md">
+      <div className="px-4 py-2.5 border-b border-[#232830] flex items-center justify-between">
+        <h2 className="text-[13px] font-bold text-white">{title}</h2>
+        <span className="text-[11px] text-[#6c727f] tabular-nums">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-[12px] text-[#6c727f] px-4 py-6 text-center">없음</p>
+      ) : (
+        <ul className="divide-y divide-[#1a1e25]">
+          {items.map((c) => {
+            const other = mode === "received" ? c.fromUser : c.toUser;
+            return (
+              <li key={c.id} className="px-4 py-2.5 flex items-center justify-between hover:bg-[#1a1e25]/40">
+                <div className="min-w-0">
+                  <p className="text-[13px] text-white">
+                    {other.gameName}
+                    <span className="text-[#6c727f]">#{other.tagLine}</span>
+                  </p>
+                  <p className="text-[11px] text-[#6c727f]">
                     {c.type === "fa_contact" ? "FA 컨택" : "팀 참가 신청"}
-                  </span>
-                  {c.teamPost && (
-                    <span className="text-gray-500 text-xs ml-1">
-                      ({c.teamPost.title})
-                    </span>
-                  )}
+                    {c.teamPost && ` · ${c.teamPost.title}`}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {c.status === "pending" ? (
-                    <>
+                <div>
+                  {c.status === "pending" && mode === "received" && onAction && (
+                    <div className="flex gap-1.5">
                       <button
-                        onClick={() => handleContactAction(c.id, "accepted")}
-                        className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition"
+                        onClick={() => onAction(c.id, "accepted")}
+                        className="text-[11px] bg-[#2bc66c] hover:opacity-90 text-black font-semibold px-2 py-0.5 rounded"
                       >
                         수락
                       </button>
                       <button
-                        onClick={() => handleContactAction(c.id, "rejected")}
-                        className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg transition"
+                        onClick={() => onAction(c.id, "rejected")}
+                        className="text-[11px] bg-[#1a1e25] hover:bg-[#232830] text-[#a3a8b3] border border-[#232830] px-2 py-0.5 rounded"
                       >
                         거절
                       </button>
-                    </>
-                  ) : c.status === "accepted" ? (
-                    <Link
-                      href={`/chat/${c.id}`}
-                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition"
-                    >
-                      채팅
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-gray-500">거절됨</span>
+                    </div>
                   )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
-        <h2 className="text-lg font-bold mb-4">보낸 컨택</h2>
-        {sent.length === 0 ? (
-          <p className="text-gray-500 text-sm">보낸 컨택이 없습니다.</p>
-        ) : (
-          <div className="space-y-3">
-            {sent.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between bg-gray-900/50 rounded-lg p-3"
-              >
-                <div>
-                  <span className="text-white font-medium">
-                    {c.toUser.gameName}
-                    <span className="text-gray-500">#{c.toUser.tagLine}</span>
-                  </span>
-                  <span className="text-gray-500 text-xs ml-2">
-                    {c.type === "fa_contact" ? "FA 컨택" : "팀 참가 신청"}
-                  </span>
-                </div>
-                <div>
-                  {c.status === "pending" && (
-                    <span className="text-xs text-yellow-400">대기 중</span>
+                  {c.status === "pending" && mode === "sent" && (
+                    <span className="text-[11px] text-[#e6b73f]">● 대기 중</span>
                   )}
                   {c.status === "accepted" && (
                     <Link
                       href={`/chat/${c.id}`}
-                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition"
+                      className="text-[11px] bg-[#e08a3c] hover:bg-[#f09a48] text-black font-semibold px-2 py-0.5 rounded"
                     >
                       채팅
                     </Link>
                   )}
                   {c.status === "rejected" && (
-                    <span className="text-xs text-gray-500">거절됨</span>
+                    <span className="text-[11px] text-[#6c727f]">거절됨</span>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

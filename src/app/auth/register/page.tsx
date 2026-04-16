@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { POSITIONS } from "@/lib/tierScore";
 
+const inputCls =
+  "w-full bg-[#0b0d11] border border-[#232830] rounded px-3 py-2.5 text-[14px] text-white focus:border-[#e08a3c] focus:outline-none";
+
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -32,27 +35,15 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    if (form.password !== form.passwordConfirm) {
-      setError("비밀번호가 일치하지 않습니다.");
-      return;
-    }
-    if (form.password.length < 6) {
-      setError("비밀번호는 6자 이상이어야 합니다.");
-      return;
-    }
-    if (!/^[a-zA-Z0-9_]{4,20}$/.test(form.username)) {
-      setError("아이디는 영문/숫자/_ 4~20자여야 합니다.");
-      return;
-    }
+    if (form.password !== form.passwordConfirm) return setError("비밀번호가 일치하지 않습니다.");
+    if (form.password.length < 6) return setError("비밀번호는 6자 이상이어야 합니다.");
+    if (!/^[a-zA-Z0-9_]{4,20}$/.test(form.username))
+      return setError("아이디는 영문/숫자/_ 4~20자여야 합니다.");
     const phone = form.phoneNumber.replace(/[-\s]/g, "");
-    if (!/^010\d{8}$/.test(phone)) {
-      setError("올바른 휴대폰 번호 형식이 아닙니다 (예: 01012345678).");
-      return;
-    }
+    if (!/^010\d{8}$/.test(phone))
+      return setError("올바른 휴대폰 번호 형식이 아닙니다 (예: 01012345678).");
 
     setLoading(true);
-
     try {
       const res = await fetch("/api/register", {
         method: "POST",
@@ -67,14 +58,12 @@ export default function RegisterPage() {
           bio: form.bio || null,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "회원가입 중 오류가 발생했습니다.");
         setLoading(false);
         return;
       }
-
       router.push("/auth/login?registered=true");
     } catch {
       setError("회원가입 중 오류가 발생했습니다.");
@@ -83,127 +72,110 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold text-center mb-2">회원가입</h1>
-      <p className="text-center text-gray-500 text-sm mb-8">
-        라이엇 계정을 통해 시즌 티어가 자동으로 등록됩니다.
+    <div className="max-w-md mx-auto px-4 py-8">
+      <h1 className="text-[20px] font-bold text-white mb-1">회원가입</h1>
+      <p className="text-[12px] text-[#6c727f] mb-6">
+        라이엇 계정으로 시즌 티어가 자동 등록됩니다
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="bg-red-500/20 border border-red-500/50 text-red-300 text-sm p-3 rounded-lg">
+          <div className="bg-[#e3603f]/10 border border-[#e3603f]/40 text-[#e3603f] text-[12px] p-2.5 rounded">
             {error}
           </div>
         )}
 
-        {/* Username */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">아이디</label>
+          <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">아이디</label>
           <input
             type="text"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
             required
             autoComplete="username"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+            className={inputCls}
             placeholder="영문/숫자/_ 4~20자"
           />
         </div>
 
-        {/* Password */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">비밀번호</label>
-          <input
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-            autoComplete="new-password"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-            placeholder="6자 이상"
-          />
-        </div>
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            비밀번호 확인
-          </label>
-          <input
-            type="password"
-            value={form.passwordConfirm}
-            onChange={(e) =>
-              setForm({ ...form, passwordConfirm: e.target.value })
-            }
-            required
-            autoComplete="new-password"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">비밀번호</label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+              autoComplete="new-password"
+              className={inputCls}
+              placeholder="6자 이상"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">확인</label>
+            <input
+              type="password"
+              value={form.passwordConfirm}
+              onChange={(e) => setForm({ ...form, passwordConfirm: e.target.value })}
+              required
+              autoComplete="new-password"
+              className={inputCls}
+            />
+          </div>
         </div>
 
-        {/* Phone */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            휴대폰 번호
-          </label>
+          <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">휴대폰 번호</label>
           <input
             type="tel"
             value={form.phoneNumber}
-            onChange={(e) =>
-              setForm({ ...form, phoneNumber: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
             required
             autoComplete="tel"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+            className={inputCls}
             placeholder="01012345678"
           />
-          <p className="text-xs text-gray-500 mt-1">
-            한 명당 한 계정만 가입할 수 있습니다. (인증은 추후 도입 예정)
-          </p>
+          <p className="text-[10px] text-[#6c727f] mt-1">한 명당 한 계정만 가입 가능합니다</p>
         </div>
 
-        {/* Riot ID */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            라이엇 ID
-          </label>
-          <div className="flex gap-2">
+          <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">라이엇 ID</label>
+          <div className="flex gap-1.5">
             <input
               type="text"
               value={form.gameName}
               onChange={(e) => setForm({ ...form, gameName: e.target.value })}
               required
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+              className={`flex-1 ${inputCls}`}
               placeholder="소환사명"
             />
-            <span className="flex items-center text-gray-500 text-xl">#</span>
+            <span className="self-center text-[#6c727f]">#</span>
             <input
               type="text"
               value={form.tagLine}
               onChange={(e) => setForm({ ...form, tagLine: e.target.value })}
               required
-              className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+              className={`w-20 ${inputCls}`}
               placeholder="KR1"
             />
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            라이엇 API로 실제 계정인지 확인하고 S15 / S16 티어를 자동으로 가져옵니다.
+          <p className="text-[10px] text-[#6c727f] mt-1">
+            라이엇 API로 검증 + S15/S16 티어 자동 조회
           </p>
         </div>
 
-        {/* Preferred Positions */}
         <div>
-          <label className="block text-sm text-gray-400 mb-2">
-            선호 포지션 (복수 선택 가능)
-          </label>
-          <div className="flex flex-wrap gap-2">
+          <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1.5">선호 포지션</label>
+          <div className="flex flex-wrap gap-1.5">
             {POSITIONS.map((pos) => (
               <button
                 key={pos.value}
                 type="button"
                 onClick={() => togglePosition(pos.value)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                className={`px-2.5 py-1 rounded text-[12px] transition border ${
                   form.preferredPositions.includes(pos.value)
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    ? "bg-[#e08a3c] text-black border-[#e08a3c] font-semibold"
+                    : "bg-[#0b0d11] text-[#a3a8b3] border-[#232830] hover:border-[#3a414c]"
                 }`}
               >
                 {pos.icon} {pos.label}
@@ -212,33 +184,30 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Bio */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            소개 (선택)
-          </label>
+          <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">소개 (선택)</label>
           <textarea
             value={form.bio}
             onChange={(e) => setForm({ ...form, bio: e.target.value })}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none resize-none"
             rows={3}
-            placeholder="간단한 자기소개, 플레이 스타일 등"
             maxLength={200}
+            placeholder="플레이 스타일, 가능 시간 등"
+            className={`w-full resize-none ${inputCls}`}
           />
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-lg font-medium transition"
+          className="w-full bg-[#e08a3c] hover:bg-[#f09a48] disabled:opacity-50 text-black py-2.5 rounded font-semibold text-[13px] transition"
         >
           {loading ? "가입 처리 중..." : "회원가입"}
         </button>
       </form>
 
-      <p className="text-center text-gray-500 text-sm mt-6">
+      <p className="text-center text-[#6c727f] text-[12px] mt-6">
         이미 계정이 있으신가요?{" "}
-        <Link href="/auth/login" className="text-blue-400 hover:underline">
+        <Link href="/auth/login" className="text-[#e08a3c] hover:underline font-medium">
           로그인
         </Link>
       </p>

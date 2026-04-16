@@ -18,32 +18,32 @@ export default function TeamCard({
   const timeAgo = getTimeAgo(new Date(post.createdAt));
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-yellow-500/50 transition-all">
-      <div className="flex items-start justify-between mb-2">
-        <h3 className="text-white font-bold text-lg">{post.title}</h3>
-        <span className="text-xs text-gray-500 shrink-0 ml-2">{timeAgo}</span>
+    <div className="bg-[#14171d] border border-[#232830] rounded-md p-4 hover:border-[#3a414c] transition">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <h3 className="text-white font-bold text-[15px] leading-tight">
+          {post.title}
+        </h3>
+        <span className="text-[11px] text-[#6c727f] shrink-0">{timeAgo}</span>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-gray-400 text-sm">
+      <div className="flex items-center gap-2 mb-3 text-[12px] text-[#a3a8b3]">
+        <span>
           {post.user.gameName}
-          <span className="text-gray-500">#{post.user.tagLine}</span>
+          <span className="text-[#6c727f]">#{post.user.tagLine}</span>
         </span>
-        <TierBadge
-          tier={post.user.currentTier}
-          rank={post.user.currentRank}
-          size="sm"
-        />
+        <TierBadge tier={post.user.currentTier} rank={post.user.currentRank} size="xs" />
       </div>
 
-      <p className="text-gray-300 text-sm mb-4 whitespace-pre-wrap">
+      <p className="text-[13px] text-[#cdd1d8] mb-3 whitespace-pre-wrap leading-relaxed">
         {post.description}
       </p>
 
       {post.positions.length > 0 && (
-        <div className="mb-3">
-          <span className="text-xs text-gray-500 mb-1 block">모집 포지션</span>
-          <div className="flex flex-wrap gap-1.5">
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wider text-[#6c727f]">
+            모집
+          </span>
+          <div className="flex flex-wrap gap-1">
             {post.positions.map((pos) => (
               <PositionBadge key={pos} position={pos} />
             ))}
@@ -52,9 +52,9 @@ export default function TeamCard({
       )}
 
       {(post.minTier || post.maxTier) && (
-        <p className="text-xs text-gray-500 mb-3">
-          티어 조건:{" "}
-          <span className="text-gray-300">
+        <p className="text-[11px] text-[#6c727f] mb-3">
+          티어:{" "}
+          <span className="text-[#a3a8b3]">
             {post.minTier || "제한없음"} ~ {post.maxTier || "제한없음"}
           </span>
         </p>
@@ -63,7 +63,7 @@ export default function TeamCard({
       {onApply && currentUserId && currentUserId !== post.userId && (
         <button
           onClick={() => onApply(post.id, post.userId)}
-          className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 rounded-lg transition font-medium"
+          className="w-full bg-[#1a1e25] hover:bg-[#232830] border border-[#232830] hover:border-[#e08a3c] text-white text-[12px] py-1.5 rounded font-medium transition"
         >
           참가 신청
         </button>

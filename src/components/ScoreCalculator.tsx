@@ -23,11 +23,9 @@ interface SeasonData {
 interface PlayerSlot {
   position: string;
   mode: InputMode;
-  // 티어 모드
   tier: string;
   rank: string;
-  games: string; // 판수 텍스트 입력 (빈 문자열이면 패널티 미적용)
-  // 닉네임 모드
+  games: string;
   gameName: string;
   tagLine: string;
   resolvedS16: SeasonData | null;
@@ -79,62 +77,32 @@ interface ScoreResult {
 
 function scoreOf(p: PlayerSlot): ScoreResult {
   if (p.mode === "nickname") {
-    const s16Raw = p.resolvedS16;
-    const s15Raw = p.resolvedS15;
-    const s16 = normalizedSeasonScore(s16Raw, p.position);
-    const s15 = normalizedSeasonScore(s15Raw, p.position);
-
-    if (!s16 && !s15) {
+    const s16 = normalizedSeasonScore(p.resolvedS16, p.position);
+    const s15 = normalizedSeasonScore(p.resolvedS15, p.position);
+    if (!s16 && !s15)
       return { total: 0, chosenSeason: null, chosenTier: null, chosenRank: null, chosenGames: null, penalty: 0 };
-    }
     if (!s16) {
-      return {
-        total: s15!.score,
-        chosenSeason: "S15",
-        chosenTier: s15!.tier,
-        chosenRank: s15!.rank,
-        chosenGames: s15!.games,
-        penalty: gamesPenalty(s15!.games),
-      };
+      return { total: s15!.score, chosenSeason: "S15", chosenTier: s15!.tier, chosenRank: s15!.rank, chosenGames: s15!.games, penalty: gamesPenalty(s15!.games) };
     }
     if (!s15) {
-      return {
-        total: s16.score,
-        chosenSeason: "S16",
-        chosenTier: s16.tier,
-        chosenRank: s16.rank,
-        chosenGames: s16.games,
-        penalty: gamesPenalty(s16.games),
-      };
+      return { total: s16.score, chosenSeason: "S16", chosenTier: s16.tier, chosenRank: s16.rank, chosenGames: s16.games, penalty: gamesPenalty(s16.games) };
     }
-
-    // 두 시즌 모두 있으면:
-    //   1) 먼저 티어(base 점수)가 더 높은 쪽 선택
-    //   2) 티어 동률이면 판수 많은 쪽(= 패널티 적은 쪽) 선택
     const s15Base = s15.score - gamesPenalty(s15.games);
     const s16Base = s16.score - gamesPenalty(s16.games);
     let pick: typeof s15;
     if (s15Base > s16Base) pick = s15;
     else if (s16Base > s15Base) pick = s16;
     else {
-      // 동률 — 판수 많은 쪽 (null은 최저 취급)
       const g15 = s15.games ?? -1;
       const g16 = s16.games ?? -1;
       pick = g15 >= g16 ? s15 : s16;
     }
     const season: "S15" | "S16" = pick === s15 ? "S15" : "S16";
-    return {
-      total: pick.score,
-      chosenSeason: season,
-      chosenTier: pick.tier,
-      chosenRank: pick.rank,
-      chosenGames: pick.games,
-      penalty: gamesPenalty(pick.games),
-    };
+    return { total: pick.score, chosenSeason: season, chosenTier: pick.tier, chosenRank: pick.rank, chosenGames: pick.games, penalty: gamesPenalty(pick.games) };
   }
 
-  // 티어 모드
-  if (!p.tier) return { total: 0, chosenSeason: null, chosenTier: null, chosenRank: null, chosenGames: null, penalty: 0 };
+  if (!p.tier)
+    return { total: 0, chosenSeason: null, chosenTier: null, chosenRank: null, chosenGames: null, penalty: 0 };
   const gamesNum = p.games === "" ? null : parseInt(p.games, 10);
   const rankForScore =
     p.tier === "SILVER_BELOW" || p.tier === "DIAMOND_ABOVE" ? "" : p.rank;
@@ -156,6 +124,9 @@ function scoreOf(p: PlayerSlot): ScoreResult {
     penalty: gamesPenalty(gamesNum),
   };
 }
+
+const inputCls =
+  "bg-[#0b0d11] border border-[#232830] rounded px-2 py-1.5 text-[13px] text-white focus:border-[#e08a3c] focus:outline-none";
 
 export default function ScoreCalculator() {
   const [players, setPlayers] = useState<PlayerSlot[]>(
@@ -191,7 +162,6 @@ export default function ScoreCalculator() {
     }
     updatePlayer(index, "lookupLoading", true);
     updatePlayer(index, "lookupError", null);
-
     try {
       const res = await fetch("/api/calc/lookup", {
         method: "POST",
@@ -220,68 +190,72 @@ export default function ScoreCalculator() {
   const totalScore = results.reduce((a, b) => a + b.total, 0);
   const remaining = TEAM_POINT_CAP - totalScore;
   const isOverCap = remaining < 0;
+  const fillPct = Math.min((totalScore / TEAM_POINT_CAP) * 100, 100);
 
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-bold text-white">LCMC 팀 포인트 계산기</h2>
-        <div
-          className={`text-right ${isOverCap ? "text-red-400" : "text-green-400"}`}
-        >
-          <p className="text-2xl font-bold">
-            {totalScore} / {TEAM_POINT_CAP}
+    <section className="bg-[#14171d] border border-[#232830] rounded-md">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#232830]">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-[#6c727f]">
+            LCMC TEAM POINT
           </p>
-          <p className="text-sm">
-            {isOverCap
-              ? `${Math.abs(remaining)}점 초과!`
-              : `${remaining}점 여유`}
+          <h2 className="text-[15px] font-bold text-white">팀 포인트 계산기</h2>
+        </div>
+        <div className={`text-right ${isOverCap ? "text-[#e3603f]" : "text-white"}`}>
+          <p className="text-[24px] font-extrabold leading-none tabular-nums">
+            {totalScore}
+            <span className="text-[#6c727f] text-base font-normal">/{TEAM_POINT_CAP}</span>
+          </p>
+          <p className="text-[11px] mt-0.5">
+            {isOverCap ? (
+              <span className="text-[#e3603f]">{Math.abs(remaining)}점 초과</span>
+            ) : (
+              <span className="text-[#6c727f]">{remaining}점 남음</span>
+            )}
           </p>
         </div>
       </div>
-      <p className="text-xs text-gray-500 mb-5">
-        판수 패널티: 20판 이하 +4, 40판 이하 +2. 닉네임 모드는 S15/S16 중 유리한
-        쪽 자동 선택.
-      </p>
 
       {/* Progress bar */}
-      <div className="w-full bg-gray-700 rounded-full h-3 mb-6 overflow-hidden">
+      <div className="h-[3px] bg-[#0b0d11]">
         <div
-          className={`h-full rounded-full transition-all duration-300 ${
+          className={`h-full transition-all ${
             isOverCap
-              ? "bg-red-500"
+              ? "bg-[#e3603f]"
               : totalScore > TEAM_POINT_CAP * 0.85
-                ? "bg-yellow-500"
-                : "bg-blue-500"
+                ? "bg-[#e6b73f]"
+                : "bg-[#e08a3c]"
           }`}
-          style={{
-            width: `${Math.min((totalScore / TEAM_POINT_CAP) * 100, 100)}%`,
-          }}
+          style={{ width: `${fillPct}%` }}
         />
       </div>
 
-      <div className="space-y-3">
+      {/* Rows */}
+      <div className="divide-y divide-[#1a1e25]">
         {players.map((player, i) => {
           const posInfo = POSITIONS.find((p) => p.value === player.position);
           const result = results[i];
-
           return (
-            <div key={i} className="bg-gray-900/50 rounded-lg p-3">
-              <div className="flex items-center gap-3">
-                <div className="w-16 text-center shrink-0">
-                  <span className="text-lg">{posInfo?.icon || "?"}</span>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {posInfo?.label || "포지션"}
-                  </p>
+            <div key={i} className="px-3 py-2.5 hover:bg-[#1a1e25]/40">
+              <div className="flex items-center gap-2">
+                {/* Position */}
+                <div className="w-12 shrink-0 flex flex-col items-center">
+                  <span className="text-base leading-none">{posInfo?.icon}</span>
+                  <span className="text-[10px] text-[#6c727f] mt-0.5">
+                    {posInfo?.label}
+                  </span>
                 </div>
 
-                <div className="flex flex-col gap-1 shrink-0">
+                {/* Mode toggle */}
+                <div className="flex shrink-0 rounded overflow-hidden border border-[#232830]">
                   <button
                     type="button"
                     onClick={() => switchMode(i, "tier")}
-                    className={`text-[11px] px-2 py-0.5 rounded ${
+                    className={`text-[10px] px-1.5 py-0.5 ${
                       player.mode === "tier"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-700 text-gray-400"
+                        ? "bg-[#e08a3c] text-black font-semibold"
+                        : "text-[#6c727f] hover:text-white"
                     }`}
                   >
                     티어
@@ -289,22 +263,23 @@ export default function ScoreCalculator() {
                   <button
                     type="button"
                     onClick={() => switchMode(i, "nickname")}
-                    className={`text-[11px] px-2 py-0.5 rounded ${
+                    className={`text-[10px] px-1.5 py-0.5 border-l border-[#232830] ${
                       player.mode === "nickname"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-700 text-gray-400"
+                        ? "bg-[#e08a3c] text-black font-semibold"
+                        : "text-[#6c727f] hover:text-white"
                     }`}
                   >
                     닉네임
                   </button>
                 </div>
 
+                {/* Inputs */}
                 {player.mode === "tier" ? (
                   <>
                     <select
                       value={player.tier}
                       onChange={(e) => updatePlayer(i, "tier", e.target.value)}
-                      className="flex-1 min-w-0 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      className={`flex-1 min-w-0 ${inputCls}`}
                     >
                       <option value="">티어 선택</option>
                       <option value="SILVER_BELOW">실버 4 이하</option>
@@ -312,9 +287,7 @@ export default function ScoreCalculator() {
                         tier === "DIAMOND" ? (
                           <optgroup key={tier} label="다이아">
                             <option value={tier}>{TIER_LABELS[tier]}</option>
-                            <option value="DIAMOND_ABOVE">
-                              다이아 1 이상
-                            </option>
+                            <option value="DIAMOND_ABOVE">다이아 1 이상</option>
                           </optgroup>
                         ) : (
                           <option key={tier} value={tier}>
@@ -323,16 +296,13 @@ export default function ScoreCalculator() {
                         )
                       )}
                     </select>
-
                     {player.tier &&
                       player.tier !== "SILVER_BELOW" &&
                       player.tier !== "DIAMOND_ABOVE" && (
                         <select
                           value={player.rank}
-                          onChange={(e) =>
-                            updatePlayer(i, "rank", e.target.value)
-                          }
-                          className="w-16 bg-gray-700 border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                          onChange={(e) => updatePlayer(i, "rank", e.target.value)}
+                          className={`w-14 ${inputCls}`}
                         >
                           <option value="">단계</option>
                           {(player.tier === "DIAMOND"
@@ -345,15 +315,13 @@ export default function ScoreCalculator() {
                           ))}
                         </select>
                       )}
-
                     <input
                       type="number"
                       min={0}
                       value={player.games}
                       onChange={(e) => updatePlayer(i, "games", e.target.value)}
                       placeholder="판수"
-                      title="해당 티어 달성 시즌 판수 (비우면 패널티 없음)"
-                      className="w-16 bg-gray-700 border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      className={`w-16 ${inputCls}`}
                     />
                   </>
                 ) : (
@@ -361,68 +329,65 @@ export default function ScoreCalculator() {
                     <input
                       type="text"
                       value={player.gameName}
-                      onChange={(e) =>
-                        updatePlayer(i, "gameName", e.target.value)
-                      }
+                      onChange={(e) => updatePlayer(i, "gameName", e.target.value)}
                       placeholder="닉네임"
-                      className="flex-1 min-w-0 bg-gray-700 border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      className={`flex-1 min-w-0 ${inputCls}`}
                     />
-                    <span className="flex items-center text-gray-500">#</span>
+                    <span className="self-center text-[#6c727f] text-xs">#</span>
                     <input
                       type="text"
                       value={player.tagLine}
-                      onChange={(e) =>
-                        updatePlayer(i, "tagLine", e.target.value)
-                      }
+                      onChange={(e) => updatePlayer(i, "tagLine", e.target.value)}
                       placeholder="KR1"
-                      className="w-14 bg-gray-700 border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      className={`w-12 ${inputCls}`}
                     />
                     <button
                       type="button"
                       onClick={() => lookupNickname(i)}
                       disabled={player.lookupLoading}
-                      className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-2 py-1 rounded-lg whitespace-nowrap"
+                      className="text-[11px] bg-[#e08a3c] hover:bg-[#f09a48] disabled:opacity-50 text-black font-semibold px-2 rounded"
                     >
-                      {player.lookupLoading ? "..." : "조회"}
+                      {player.lookupLoading ? "…" : "조회"}
                     </button>
                   </div>
                 )}
 
-                <div className="w-16 text-right shrink-0">
-                  <span className="text-yellow-400 font-bold">
+                {/* Score */}
+                <div className="w-14 text-right shrink-0">
+                  <span className="text-[#e6b73f] font-extrabold tabular-nums text-[15px]">
                     {result.total}
                   </span>
-                  <span className="text-gray-500 text-xs">점</span>
+                  <span className="text-[#6c727f] text-[10px] ml-0.5">점</span>
                 </div>
               </div>
 
-              {/* 결과 / 에러 영역 */}
+              {/* Result line */}
               {((player.mode === "nickname" &&
                 (result.chosenSeason || player.lookupError)) ||
                 (player.mode === "tier" && result.penalty > 0)) && (
-                <div className="ml-[120px] mt-2 text-xs">
+                <div className="ml-[60px] mt-1 text-[11px]">
                   {player.lookupError && (
-                    <p className="text-red-400">{player.lookupError}</p>
+                    <span className="text-[#e3603f]">{player.lookupError}</span>
                   )}
                   {!player.lookupError && player.mode === "nickname" && result.chosenSeason && (
-                    <p className="text-gray-300">
-                      → {result.chosenSeason} 기준{" "}
+                    <span className="text-[#a3a8b3]">
+                      {result.chosenSeason} ·{" "}
                       {result.chosenTier && result.chosenTier !== "UNRANKED"
                         ? `${TIER_LABELS[result.chosenTier] ?? result.chosenTier}${result.chosenRank ? ` ${result.chosenRank}` : ""}`
-                        : "언랭 (실4 이하 점수)"}
+                        : "언랭(실4↓ 점수)"}
                       {result.chosenGames != null && ` · ${result.chosenGames}판`}
                       {result.penalty > 0 && (
-                        <span className="text-red-400">
-                          {" "}· 판수 패널티 +{result.penalty}
-                        </span>
+                        <span className="text-[#e3603f]"> · +{result.penalty}</span>
                       )}
-                      {player.locked && result.chosenSeason === "S16" && " (확정)"}
-                    </p>
+                      {player.locked && result.chosenSeason === "S16" && (
+                        <span className="text-[#e6b73f]"> · 확정</span>
+                      )}
+                    </span>
                   )}
                   {!player.lookupError && player.mode === "tier" && result.penalty > 0 && (
-                    <p className="text-red-400">
-                      판수 {player.games}판 → 패널티 +{result.penalty}
-                    </p>
+                    <span className="text-[#e3603f]">
+                      {player.games}판 · 패널티 +{result.penalty}
+                    </span>
                   )}
                 </div>
               )}
@@ -431,12 +396,16 @@ export default function ScoreCalculator() {
         })}
       </div>
 
-      <button
-        onClick={() => setPlayers(POSITIONS.map((p) => emptySlot(p.value)))}
-        className="mt-4 text-sm text-gray-400 hover:text-white transition"
-      >
-        초기화
-      </button>
-    </div>
+      {/* Footer */}
+      <div className="flex items-center justify-between px-3 py-2 border-t border-[#232830] text-[11px] text-[#6c727f]">
+        <span>판수 패널티: 20판↓ +4 / 40판↓ +2</span>
+        <button
+          onClick={() => setPlayers(POSITIONS.map((p) => emptySlot(p.value)))}
+          className="hover:text-white transition"
+        >
+          초기화
+        </button>
+      </div>
+    </section>
   );
 }

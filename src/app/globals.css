@@ -1,30 +1,81 @@
+/* Pretendard — 한국어 LoL 사이트에서 흔히 쓰는 폰트 */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 @import "tailwindcss";
 
 :root {
-  --background: #111827;
-  --foreground: #f3f4f6;
+  /* 다크 데이터 대시보드 톤 */
+  --bg: #0b0d11;
+  --bg-elevated: #14171d;
+  --bg-row: #1a1e25;
+  --border: #232830;
+  --border-strong: #2f3640;
+
+  --text: #e6e7ea;
+  --text-mute: #a3a8b3;
+  --text-dim: #6c727f;
+
+  --accent: #e08a3c;          /* 앰버 — op.gg 느낌 */
+  --accent-hover: #f09a48;
+  --link: #5ea4ff;
+  --good: #2bc66c;
+  --bad: #e3603f;
+  --warn: #e6b73f;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-feature-settings: "ss01", "tnum";
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-elevated: var(--bg-elevated);
+  --color-row: var(--bg-row);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-mute: var(--text-mute);
+  --color-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-link: var(--link);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-}
-
-/* Custom scrollbar */
+/* 스크롤바 */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: var(--bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 3px;
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a414c;
+}
+
+/* 숫자는 등폭 */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* select 기본 화살표 — 다크에 맞게 */
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236c727f' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 18px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px !important;
+}
+
+/* hr 분리선 */
+.divider {
+  border-top: 1px solid var(--border);
 }

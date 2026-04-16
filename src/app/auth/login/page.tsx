@@ -16,13 +16,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    const result = await signIn("credentials", {
-      username,
-      password,
-      redirect: false,
-    });
-
+    const result = await signIn("credentials", { username, password, redirect: false });
     if (result?.error) {
       setError("아이디 또는 비밀번호가 올바르지 않습니다.");
       setLoading(false);
@@ -32,54 +26,54 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <h1 className="text-2xl font-bold text-center mb-8">로그인</h1>
+  const inputCls =
+    "w-full bg-[#0b0d11] border border-[#232830] rounded px-3 py-2.5 text-[14px] text-white focus:border-[#e08a3c] focus:outline-none";
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+  return (
+    <div className="max-w-sm mx-auto px-4 py-12">
+      <h1 className="text-[20px] font-bold text-white mb-1">로그인</h1>
+      <p className="text-[12px] text-[#6c727f] mb-6">계속하려면 계정이 필요합니다</p>
+
+      <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
-          <div className="bg-red-500/20 border border-red-500/50 text-red-300 text-sm p-3 rounded-lg">
+          <div className="bg-[#e3603f]/10 border border-[#e3603f]/40 text-[#e3603f] text-[12px] p-2.5 rounded">
             {error}
           </div>
         )}
-
         <div>
-          <label className="block text-sm text-gray-400 mb-1">아이디</label>
+          <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">아이디</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
             autoComplete="username"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-            placeholder="아이디"
+            className={inputCls}
           />
         </div>
-
         <div>
-          <label className="block text-sm text-gray-400 mb-1">비밀번호</label>
+          <label className="block text-[11px] uppercase tracking-wider text-[#6c727f] mb-1">비밀번호</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+            className={inputCls}
           />
         </div>
-
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition"
+          className="w-full bg-[#e08a3c] hover:bg-[#f09a48] disabled:opacity-50 text-black py-2.5 rounded font-semibold text-[13px] transition"
         >
           {loading ? "로그인 중..." : "로그인"}
         </button>
       </form>
 
-      <p className="text-center text-gray-500 text-sm mt-6">
+      <p className="text-center text-[#6c727f] text-[12px] mt-6">
         계정이 없으신가요?{" "}
-        <Link href="/auth/register" className="text-blue-400 hover:underline">
+        <Link href="/auth/register" className="text-[#e08a3c] hover:underline font-medium">
           회원가입
         </Link>
       </p>

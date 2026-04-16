@@ -2,7 +2,6 @@
 
 import TierBadge from "./TierBadge";
 import PositionBadge from "./PositionBadge";
-import { formatTier, getTierScore, POSITIONS } from "@/lib/tierScore";
 import type { UserProfile } from "@/lib/types";
 
 interface PlayerCardProps {
@@ -16,83 +15,67 @@ export default function PlayerCard({
   currentUserId,
   onContact,
 }: PlayerCardProps) {
-  const peakS15 = formatTier(player.peakTierS15, player.peakRankS15);
-  const peakS16 = formatTier(player.peakTierS16, player.peakRankS16);
+  const isMe = currentUserId === player.id;
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-blue-500/50 transition-all">
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="text-white font-bold text-lg">
-          {player.gameName}
-          <span className="text-gray-400 font-normal text-sm">
-            #{player.tagLine}
-          </span>
-        </h3>
+    <div className="bg-[#14171d] border border-[#232830] rounded-md p-3.5 hover:border-[#3a414c] transition">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <p className="text-white font-bold text-[14px] leading-tight truncate">
+            {player.gameName}
+            <span className="text-[#6c727f] font-normal text-xs ml-0.5">
+              #{player.tagLine}
+            </span>
+          </p>
+          {player.preferredPositions.length > 0 && (
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {player.preferredPositions.map((p) => (
+                <PositionBadge key={p} position={p} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-2 mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-400 w-24 shrink-0">S16 현재</span>
+      {/* Tier rows */}
+      <div className="space-y-1 mb-3 mt-3 pt-3 border-t border-[#1a1e25]">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wider text-[#6c727f]">S16 현재</span>
           <TierBadge
             tier={player.currentTier}
             rank={player.currentRank}
             lp={player.currentLP}
-            size="sm"
           />
         </div>
-        {player.peakTierS15 && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400 w-24 shrink-0">S15 최고</span>
-            <span className="text-gray-200">{peakS15}</span>
+        {player.peakTierS16 && (
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wider text-[#6c727f]">S16 최고</span>
+            <TierBadge tier={player.peakTierS16} rank={player.peakRankS16} />
           </div>
         )}
-        {player.peakTierS16 && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400 w-24 shrink-0">S16 최고</span>
-            <span className="text-gray-200">{peakS16}</span>
+        {player.peakTierS15 && (
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wider text-[#6c727f]">S15 최고</span>
+            <TierBadge tier={player.peakTierS15} rank={player.peakRankS15} />
           </div>
         )}
       </div>
 
-      {/* 포지션별 점수 */}
-      {player.preferredPositions.length > 0 && (
-        <div className="mb-3">
-          <div className="flex flex-wrap gap-2">
-            {player.preferredPositions.map((pos) => {
-              const posInfo = POSITIONS.find((p) => p.value === pos);
-              const score = getTierScore(
-                player.currentTier || "UNRANKED",
-                player.currentRank || "",
-                pos
-              );
-              return (
-                <div
-                  key={pos}
-                  className="flex items-center gap-1.5 bg-gray-700/70 rounded-lg px-2.5 py-1.5"
-                >
-                  <span className="text-sm">{posInfo?.icon}</span>
-                  <span className="text-xs text-gray-300">{posInfo?.label}</span>
-                  <span className="text-xs text-yellow-400 font-bold ml-1">
-                    {score}점
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {player.bio && (
-        <p className="text-gray-400 text-sm mb-4 line-clamp-2">{player.bio}</p>
+        <p className="text-[12px] text-[#a3a8b3] mb-3 line-clamp-2">{player.bio}</p>
       )}
 
-      {onContact && currentUserId && currentUserId !== player.id && (
+      {onContact && currentUserId && !isMe && (
         <button
           onClick={() => onContact(player.id)}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 rounded-lg transition font-medium"
+          className="w-full bg-[#1a1e25] hover:bg-[#232830] border border-[#232830] hover:border-[#e08a3c] text-white text-[12px] py-1.5 rounded font-medium transition"
         >
           컨택 신청
         </button>
+      )}
+      {isMe && (
+        <p className="text-center text-[11px] text-[#6c727f] py-1">내 프로필</p>
       )}
     </div>
   );

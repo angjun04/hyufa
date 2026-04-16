@@ -3,43 +3,43 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Hero */}
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-extrabold mb-3">
-          HYU<span className="text-blue-400">FA</span>
+      <header className="mb-6">
+        <h1 className="text-[26px] font-extrabold tracking-tight">
+          HYU<span className="text-[#e08a3c]">FA</span>
+          <span className="ml-2 text-[13px] font-medium text-[#6c727f] align-middle">
+            한양대 LoL 교내전 점수계산 · FA 마켓
+          </span>
         </h1>
-        <p className="text-gray-400 text-lg">
-          한양대학교 LoL 교내전 점수 계산 & FA 마켓
-        </p>
-      </div>
+      </header>
 
       {/* Quick links */}
-      <div className="grid grid-cols-2 gap-4 mb-10">
+      <div className="grid grid-cols-2 gap-3 mb-6">
         <Link
           href="/fa"
-          className="bg-blue-600/20 border border-blue-600/40 rounded-xl p-5 hover:bg-blue-600/30 transition text-center"
+          className="group flex items-center justify-between bg-[#14171d] border border-[#232830] hover:border-[#3a414c] rounded-md px-4 py-3 transition"
         >
-          <span className="text-2xl block mb-2">🎮</span>
-          <h3 className="font-bold text-blue-400">FA 마켓</h3>
-          <p className="text-gray-400 text-xs mt-1">팀을 찾는 소환사</p>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-[#6c727f]">FREE AGENT</p>
+            <p className="text-sm font-bold text-white">FA 마켓</p>
+          </div>
+          <svg className="w-4 h-4 text-[#6c727f] group-hover:text-[#e08a3c]" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5l5 5-5 5V5z"/></svg>
         </Link>
         <Link
           href="/recruit"
-          className="bg-yellow-600/20 border border-yellow-600/40 rounded-xl p-5 hover:bg-yellow-600/30 transition text-center"
+          className="group flex items-center justify-between bg-[#14171d] border border-[#232830] hover:border-[#3a414c] rounded-md px-4 py-3 transition"
         >
-          <span className="text-2xl block mb-2">📋</span>
-          <h3 className="font-bold text-yellow-400">소환사 모집</h3>
-          <p className="text-gray-400 text-xs mt-1">팀원을 구하는 팀</p>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-[#6c727f]">RECRUIT</p>
+            <p className="text-sm font-bold text-white">팀 모집 게시판</p>
+          </div>
+          <svg className="w-4 h-4 text-[#6c727f] group-hover:text-[#e08a3c]" viewBox="0 0 20 20" fill="currentColor"><path d="M7 5l5 5-5 5V5z"/></svg>
         </Link>
       </div>
 
       {/* Score Calculator */}
       <ScoreCalculator />
-
-      <p className="text-center text-gray-600 text-xs mt-8">
-        본 사이트는 한양대학교 교내 리그오브레전드 대회를 위해 제작되었습니다.
-      </p>
     </div>
   );
 }
