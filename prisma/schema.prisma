@@ -8,25 +8,34 @@ datasource db {
 }
 
 model User {
-  id                 String   @id @default(cuid())
-  email              String   @unique
-  password           String
-  gameName           String
-  tagLine            String
-  puuid              String?  @unique
-  summonerId         String?
-  currentTier        String?
-  currentRank        String?
-  currentLP          Int?
-  peakTierS15        String?
-  peakRankS15        String?
-  peakTierS16        String?
-  peakRankS16        String?
+  id          String  @id @default(cuid())
+  username    String  @unique
+  password    String
+  phoneNumber String  @unique
+
+  gameName   String
+  tagLine    String
+  puuid      String  @unique
+  summonerId String?
+
+  // S15 (2025) peak — fow.kr 크롤 결과 영구 보관
+  peakTierS15   String?
+  peakRankS15   String?
+  peakSourceS15 String? // "fow" | "manual"
+
+  // S16 (2026) peak — 어드민이 정한 마감 시점에 lock
+  peakTierS16Locked String?
+  peakRankS16Locked String?
+  peakLPS16Locked   Int?
+  peakLockedAt      DateTime?
+
   preferredPositions String[] @default([])
   bio                String?
   isLookingForTeam   Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  isAdmin            Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   teamPosts        TeamPost[]
   sentContacts     ContactRequest[] @relation("SentContacts")
@@ -34,6 +43,32 @@ model User {
   messages         Message[]
 
   @@unique([gameName, tagLine])
+}
+
+// PUUID 단위 티어 캐시. 회원/비회원 모두 사용.
+model TierCache {
+  puuid    String @id
+  gameName String
+  tagLine  String
+
+  currentTier String?
+  currentRank String?
+  currentLP   Int?
+
+  // 시즌 진행 중 누적 max — lock 시 User로 복사
+  peakTierS16 String?
+  peakRankS16 String?
+  peakLPS16   Int?
+
+  refreshedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([gameName, tagLine])
+}
+
+model AppSetting {
+  key   String @id
+  value String
 }
 
 model TeamPost {

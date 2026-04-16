@@ -10,15 +10,36 @@ export async function GET() {
           id: true,
           gameName: true,
           tagLine: true,
-          currentTier: true,
-          currentRank: true,
+          puuid: true,
         },
       },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(posts);
+  // join 캐시
+  const puuids = posts.map((p) => p.user.puuid);
+  const caches = await prisma.tierCache.findMany({
+    where: { puuid: { in: puuids } },
+  });
+  const cacheByPuuid = new Map(caches.map((c) => [c.puuid, c]));
+
+  const result = posts.map((p) => {
+    const cache = cacheByPuuid.get(p.user.puuid);
+    return {
+      ...p,
+      user: {
+        id: p.user.id,
+        gameName: p.user.gameName,
+        tagLine: p.user.tagLine,
+        currentTier: cache?.currentTier ?? null,
+        currentRank: cache?.currentRank ?? null,
+        preferredPositions: [],
+      },
+    };
+  });
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: Request) {

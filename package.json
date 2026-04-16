@@ -13,6 +13,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
     "next": "16.2.3",
     "next-auth": "^5.0.0-beta.30",
     "prisma": "^5.22.0",
@@ -27,6 +28,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vercel": "^51.4.0"
   }
 }

@@ -1,31 +1,44 @@
 export interface UserProfile {
   id: string;
-  email?: string;
+  username: string;
+  phoneNumber?: string;
+  gameName: string;
+  tagLine: string;
+  // 캐시에서 가져오는 현재 시즌 정보
+  currentTier: string | null;
+  currentRank: string | null;
+  currentLP: number | null;
+  // S16 peak — 시즌 lock되면 confirmed 값, 그 전엔 진행 중 max
+  peakTierS16: string | null;
+  peakRankS16: string | null;
+  peakLPS16: number | null;
+  peakLockedAt: string | null;
+  // S15 peak — fow.kr 크롤 결과 (영구)
+  peakTierS15: string | null;
+  peakRankS15: string | null;
+  peakSourceS15: string | null;
+  // 캐시 메타
+  refreshedAt: string | null;
+  preferredPositions: string[];
+  bio: string | null;
+  isLookingForTeam?: boolean;
+  isAdmin?: boolean;
+  createdAt?: string;
+}
+
+export interface PublicPlayerInfo {
+  id: string;
   gameName: string;
   tagLine: string;
   currentTier: string | null;
   currentRank: string | null;
-  currentLP: number | null;
-  peakTierS15: string | null;
-  peakRankS15: string | null;
-  peakTierS16: string | null;
-  peakRankS16: string | null;
   preferredPositions: string[];
-  bio: string | null;
-  isLookingForTeam?: boolean;
-  createdAt?: string;
 }
 
 export interface TeamPostData {
   id: string;
   userId: string;
-  user: {
-    id: string;
-    gameName: string;
-    tagLine: string;
-    currentTier: string | null;
-    currentRank: string | null;
-  };
+  user: PublicPlayerInfo;
   title: string;
   description: string;
   positions: string[];
@@ -37,23 +50,9 @@ export interface TeamPostData {
 export interface ContactRequestData {
   id: string;
   fromUserId: string;
-  fromUser: {
-    id: string;
-    gameName: string;
-    tagLine: string;
-    currentTier: string | null;
-    currentRank: string | null;
-    preferredPositions: string[];
-  };
+  fromUser: PublicPlayerInfo;
   toUserId: string;
-  toUser: {
-    id: string;
-    gameName: string;
-    tagLine: string;
-    currentTier: string | null;
-    currentRank: string | null;
-    preferredPositions: string[];
-  };
+  toUser: PublicPlayerInfo;
   teamPost?: { id: string; title: string } | null;
   type: string;
   status: string;

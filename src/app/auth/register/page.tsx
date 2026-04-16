@@ -3,26 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { TIERS, DIVISIONS, TIER_LABELS, POSITIONS } from "@/lib/tierScore";
+import { POSITIONS } from "@/lib/tierScore";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    email: "",
+    username: "",
     password: "",
     passwordConfirm: "",
+    phoneNumber: "",
     gameName: "",
     tagLine: "",
-    peakTierS15: "",
-    peakRankS15: "",
     preferredPositions: [] as string[],
     bio: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const isHighTier = (tier: string) =>
-    tier === "MASTER" || tier === "GRANDMASTER" || tier === "CHALLENGER";
 
   const togglePosition = (pos: string) => {
     setForm((prev) => ({
@@ -45,6 +41,15 @@ export default function RegisterPage() {
       setError("비밀번호는 6자 이상이어야 합니다.");
       return;
     }
+    if (!/^[a-zA-Z0-9_]{4,20}$/.test(form.username)) {
+      setError("아이디는 영문/숫자/_ 4~20자여야 합니다.");
+      return;
+    }
+    const phone = form.phoneNumber.replace(/[-\s]/g, "");
+    if (!/^010\d{8}$/.test(phone)) {
+      setError("올바른 휴대폰 번호 형식이 아닙니다 (예: 01012345678).");
+      return;
+    }
 
     setLoading(true);
 
@@ -53,14 +58,11 @@ export default function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: form.email,
+          username: form.username,
           password: form.password,
+          phoneNumber: phone,
           gameName: form.gameName,
           tagLine: form.tagLine,
-          peakTierS15: form.peakTierS15 || null,
-          peakRankS15: isHighTier(form.peakTierS15)
-            ? "I"
-            : form.peakRankS15 || null,
           preferredPositions: form.preferredPositions,
           bio: form.bio || null,
         }),
@@ -68,7 +70,7 @@ export default function RegisterPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error);
+        setError(data.error || "회원가입 중 오류가 발생했습니다.");
         setLoading(false);
         return;
       }
@@ -82,7 +84,10 @@ export default function RegisterPage() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold text-center mb-8">회원가입</h1>
+      <h1 className="text-2xl font-bold text-center mb-2">회원가입</h1>
+      <p className="text-center text-gray-500 text-sm mb-8">
+        라이엇 계정을 통해 시즌 티어가 자동으로 등록됩니다.
+      </p>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
@@ -91,50 +96,74 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* Email / Password */}
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">이메일</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-              placeholder="email@hanyang.ac.kr"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">비밀번호</label>
-            <input
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-              placeholder="6자 이상"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">
-              비밀번호 확인
-            </label>
-            <input
-              type="password"
-              value={form.passwordConfirm}
-              onChange={(e) =>
-                setForm({ ...form, passwordConfirm: e.target.value })
-              }
-              required
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-            />
-          </div>
+        {/* Username */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-1">아이디</label>
+          <input
+            type="text"
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            required
+            autoComplete="username"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+            placeholder="영문/숫자/_ 4~20자"
+          />
+        </div>
+
+        {/* Password */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-1">비밀번호</label>
+          <input
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            required
+            autoComplete="new-password"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+            placeholder="6자 이상"
+          />
+        </div>
+        <div>
+          <label className="block text-sm text-gray-400 mb-1">
+            비밀번호 확인
+          </label>
+          <input
+            type="password"
+            value={form.passwordConfirm}
+            onChange={(e) =>
+              setForm({ ...form, passwordConfirm: e.target.value })
+            }
+            required
+            autoComplete="new-password"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-1">
+            휴대폰 번호
+          </label>
+          <input
+            type="tel"
+            value={form.phoneNumber}
+            onChange={(e) =>
+              setForm({ ...form, phoneNumber: e.target.value })
+            }
+            required
+            autoComplete="tel"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-blue-500 focus:outline-none"
+            placeholder="01012345678"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            한 명당 한 계정만 가입할 수 있습니다. (인증은 추후 도입 예정)
+          </p>
         </div>
 
         {/* Riot ID */}
         <div>
           <label className="block text-sm text-gray-400 mb-1">
-            라이엇 ID (현재 티어 자동 조회)
+            라이엇 ID
           </label>
           <div className="flex gap-2">
             <input
@@ -155,50 +184,9 @@ export default function RegisterPage() {
               placeholder="KR1"
             />
           </div>
-        </div>
-
-        {/* Peak Tier S15 */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            S15(2025) 최고 티어
-          </label>
-          <div className="flex gap-2">
-            <select
-              value={form.peakTierS15}
-              onChange={(e) => {
-                const tier = e.target.value;
-                setForm({
-                  ...form,
-                  peakTierS15: tier,
-                  peakRankS15: isHighTier(tier) ? "I" : form.peakRankS15,
-                });
-              }}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">선택 안 함</option>
-              {TIERS.map((tier) => (
-                <option key={tier} value={tier}>
-                  {TIER_LABELS[tier]}
-                </option>
-              ))}
-            </select>
-            {form.peakTierS15 && !isHighTier(form.peakTierS15) && (
-              <select
-                value={form.peakRankS15}
-                onChange={(e) =>
-                  setForm({ ...form, peakRankS15: e.target.value })
-                }
-                className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white focus:border-blue-500 focus:outline-none"
-              >
-                <option value="">단계</option>
-                {DIVISIONS.map((div) => (
-                  <option key={div} value={div}>
-                    {div}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            라이엇 API로 실제 계정인지 확인하고 S15 / S16 티어를 자동으로 가져옵니다.
+          </p>
         </div>
 
         {/* Preferred Positions */}

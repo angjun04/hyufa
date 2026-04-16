@@ -63,8 +63,7 @@ export async function GET() {
           id: true,
           gameName: true,
           tagLine: true,
-          currentTier: true,
-          currentRank: true,
+          puuid: true,
           preferredPositions: true,
         },
       },
@@ -73,8 +72,7 @@ export async function GET() {
           id: true,
           gameName: true,
           tagLine: true,
-          currentTier: true,
-          currentRank: true,
+          puuid: true,
           preferredPositions: true,
         },
       },
@@ -83,5 +81,35 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(contacts);
+  // 캐시 join — currentTier/currentRank 채우기
+  const puuids = Array.from(
+    new Set(contacts.flatMap((c) => [c.fromUser.puuid, c.toUser.puuid]))
+  );
+  const caches = await prisma.tierCache.findMany({
+    where: { puuid: { in: puuids } },
+    select: { puuid: true, currentTier: true, currentRank: true },
+  });
+  const cacheByPuuid = new Map(caches.map((c) => [c.puuid, c]));
+
+  const decorated = contacts.map((c) => ({
+    ...c,
+    fromUser: {
+      id: c.fromUser.id,
+      gameName: c.fromUser.gameName,
+      tagLine: c.fromUser.tagLine,
+      currentTier: cacheByPuuid.get(c.fromUser.puuid)?.currentTier ?? null,
+      currentRank: cacheByPuuid.get(c.fromUser.puuid)?.currentRank ?? null,
+      preferredPositions: c.fromUser.preferredPositions,
+    },
+    toUser: {
+      id: c.toUser.id,
+      gameName: c.toUser.gameName,
+      tagLine: c.toUser.tagLine,
+      currentTier: cacheByPuuid.get(c.toUser.puuid)?.currentTier ?? null,
+      currentRank: cacheByPuuid.get(c.toUser.puuid)?.currentRank ?? null,
+      preferredPositions: c.toUser.preferredPositions,
+    },
+  }));
+
+  return NextResponse.json(decorated);
 }

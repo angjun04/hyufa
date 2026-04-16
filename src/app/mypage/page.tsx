@@ -5,8 +5,21 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import TierBadge from "@/components/TierBadge";
-import { POSITIONS, TIERS, DIVISIONS, TIER_LABELS } from "@/lib/tierScore";
+import { POSITIONS } from "@/lib/tierScore";
 import type { UserProfile, ContactRequestData } from "@/lib/types";
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return "기록 없음";
+  const diff = Date.now() - new Date(iso).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}초 전`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  const day = Math.floor(hr / 24);
+  return `${day}일 전`;
+}
 
 export default function MyPage() {
   const { data: session, status } = useSession();
@@ -18,10 +31,9 @@ export default function MyPage() {
     preferredPositions: [] as string[],
     bio: "",
     isLookingForTeam: false,
-    peakTierS15: "",
-    peakRankS15: "",
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -33,14 +45,12 @@ export default function MyPage() {
     if (session?.user) {
       fetch("/api/profile")
         .then((r) => r.json())
-        .then((data) => {
+        .then((data: UserProfile) => {
           setProfile(data);
           setEditForm({
             preferredPositions: data.preferredPositions || [],
             bio: data.bio || "",
             isLookingForTeam: data.isLookingForTeam || false,
-            peakTierS15: data.peakTierS15 || "",
-            peakRankS15: data.peakRankS15 || "",
           });
         });
       fetch("/api/contact")
@@ -51,6 +61,7 @@ export default function MyPage() {
 
   const handleRefreshTier = async () => {
     setRefreshing(true);
+    setRefreshError("");
     const res = await fetch("/api/profile", { method: "PUT" });
     if (res.ok) {
       const data = await res.json();
@@ -61,12 +72,16 @@ export default function MyPage() {
               currentTier: data.currentTier,
               currentRank: data.currentRank,
               currentLP: data.currentLP,
+              peakTierS16: prev.peakLockedAt ? prev.peakTierS16 : data.peakTierS16,
+              peakRankS16: prev.peakLockedAt ? prev.peakRankS16 : data.peakRankS16,
+              peakLPS16: prev.peakLockedAt ? prev.peakLPS16 : data.peakLPS16,
+              refreshedAt: data.refreshedAt,
             }
           : prev
       );
     } else {
       const err = await res.json();
-      alert(err.error || "갱신 실패");
+      setRefreshError(err.error || "갱신 실패");
     }
     setRefreshing(false);
   };
@@ -97,9 +112,6 @@ export default function MyPage() {
     }
   };
 
-  const isHighTier = (tier: string) =>
-    tier === "MASTER" || tier === "GRANDMASTER" || tier === "CHALLENGER";
-
   if (status === "loading" || !profile) {
     return (
       <div className="text-center py-20 text-gray-500">불러오는 중...</div>
@@ -121,28 +133,47 @@ export default function MyPage() {
                 #{profile.tagLine}
               </span>
             </h1>
-            <p className="text-gray-500 text-sm">{profile.email}</p>
+            <p className="text-gray-500 text-sm">@{profile.username}</p>
+            {profile.isAdmin && (
+              <Link
+                href="/admin"
+                className="inline-block mt-1 text-xs bg-purple-600/20 text-purple-300 px-2 py-0.5 rounded-full hover:bg-purple-600/30"
+              >
+                어드민 페이지
+              </Link>
+            )}
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleRefreshTier}
-              disabled={refreshing}
-              className="text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
-            >
-              {refreshing ? "갱신 중..." : "티어 갱신"}
-            </button>
-            <button
-              onClick={() => setEditMode(!editMode)}
-              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition"
-            >
-              {editMode ? "취소" : "수정"}
-            </button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-2">
+              <button
+                onClick={handleRefreshTier}
+                disabled={refreshing}
+                className="text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {refreshing ? "갱신 중..." : "티어 갱신"}
+              </button>
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition"
+              >
+                {editMode ? "취소" : "수정"}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              마지막 갱신: {formatRelative(profile.refreshedAt)}
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        {refreshError && (
+          <div className="bg-red-500/20 border border-red-500/50 text-red-300 text-xs p-2 rounded-lg mb-3">
+            {refreshError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
           <div>
-            <span className="text-xs text-gray-500">S16 현재 티어</span>
+            <span className="text-xs text-gray-500">S16 현재</span>
             <div className="mt-1">
               <TierBadge
                 tier={profile.currentTier}
@@ -152,12 +183,30 @@ export default function MyPage() {
             </div>
           </div>
           <div>
-            <span className="text-xs text-gray-500">S15 최고 티어</span>
+            <span className="text-xs text-gray-500">
+              S16 최고{profile.peakLockedAt ? " (확정)" : " (진행 중)"}
+            </span>
+            <div className="mt-1">
+              <TierBadge tier={profile.peakTierS16} rank={profile.peakRankS16} />
+            </div>
+          </div>
+          <div>
+            <span className="text-xs text-gray-500">
+              S15 최고{profile.peakSourceS15 === "fow" ? " (fow.kr)" : ""}
+            </span>
             <div className="mt-1">
               <TierBadge tier={profile.peakTierS15} rank={profile.peakRankS15} />
             </div>
           </div>
         </div>
+
+        {profile.peakLockedAt && (
+          <p className="text-xs text-yellow-400 mb-3">
+            ⚠ S16 최고 티어가 확정되었습니다 (
+            {new Date(profile.peakLockedAt).toLocaleString("ko-KR")}). 이후 티어
+            갱신은 현재 티어에만 반영됩니다.
+          </p>
+        )}
 
         {editMode ? (
           <div className="space-y-4 mt-6 border-t border-gray-700 pt-4">
@@ -178,55 +227,6 @@ export default function MyPage() {
                 FA 마켓에 등록 (팀 찾는 중)
               </span>
             </label>
-
-            {/* Peak Tier */}
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">
-                S15 최고 티어
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={editForm.peakTierS15}
-                  onChange={(e) =>
-                    setEditForm({
-                      ...editForm,
-                      peakTierS15: e.target.value,
-                      peakRankS15: isHighTier(e.target.value)
-                        ? "I"
-                        : editForm.peakRankS15,
-                    })
-                  }
-                  className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
-                >
-                  <option value="">선택 안 함</option>
-                  {TIERS.map((t) => (
-                    <option key={t} value={t}>
-                      {TIER_LABELS[t]}
-                    </option>
-                  ))}
-                </select>
-                {editForm.peakTierS15 &&
-                  !isHighTier(editForm.peakTierS15) && (
-                    <select
-                      value={editForm.peakRankS15}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          peakRankS15: e.target.value,
-                        })
-                      }
-                      className="w-20 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
-                    >
-                      <option value="">단계</option>
-                      {DIVISIONS.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-              </div>
-            </div>
 
             {/* Positions */}
             <div>
