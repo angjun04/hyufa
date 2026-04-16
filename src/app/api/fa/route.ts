@@ -11,8 +11,11 @@ export async function GET() {
       puuid: true,
       peakTierS15: true,
       peakRankS15: true,
+      gamesS15: true,
       peakTierS16Locked: true,
       peakRankS16Locked: true,
+      peakLPS16Locked: true,
+      gamesS16Locked: true,
       peakLockedAt: true,
       preferredPositions: true,
       bio: true,
@@ -21,7 +24,6 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  // 캐시에서 currentTier / peakS16 진행 중 값 join
   const puuids = players.map((p) => p.puuid);
   const caches = await prisma.tierCache.findMany({
     where: { puuid: { in: puuids } },
@@ -37,14 +39,20 @@ export async function GET() {
       currentTier: cache?.currentTier ?? null,
       currentRank: cache?.currentRank ?? null,
       currentLP: cache?.currentLP ?? null,
+      gamesS16: p.peakLockedAt ? p.gamesS16Locked : cache?.gamesS16 ?? null,
       peakTierS16: p.peakLockedAt
         ? p.peakTierS16Locked
         : cache?.peakTierS16 ?? null,
       peakRankS16: p.peakLockedAt
         ? p.peakRankS16Locked
         : cache?.peakRankS16 ?? null,
+      peakLPS16: p.peakLockedAt
+        ? p.peakLPS16Locked
+        : cache?.peakLPS16 ?? null,
       peakTierS15: p.peakTierS15,
       peakRankS15: p.peakRankS15,
+      gamesS15: p.gamesS15,
+      peakLockedAt: p.peakLockedAt,
       preferredPositions: p.preferredPositions,
       bio: p.bio,
       createdAt: p.createdAt,
