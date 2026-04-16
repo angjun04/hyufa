@@ -68,7 +68,11 @@ export function getTierScore(
   const posIdx = POSITION_INDEX[position];
   if (posIdx === undefined) return 0;
 
-  if (!tier || tier === "UNRANKED") return 0;
+  // 입력 안 된 빈 값은 0점 (계산기 UI에서 미선택 상태)
+  if (!tier) return 0;
+
+  // 언랭은 실버4 이하 점수로 책정 (LCMC 규칙)
+  if (tier === "UNRANKED") return POSITION_SCORES["SILVER_IV"][posIdx];
 
   // 계산기 전용 특수 값
   if (tier === "DIAMOND_ABOVE") return POSITION_SCORES["DIAMOND_I"][posIdx];

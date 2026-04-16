@@ -106,9 +106,10 @@ export default function ScoreCalculator() {
         const rank = data.scoreRank as string | null;
         const season = data.scoreSeason as "S15" | "S16" | null;
         if (!tier || tier === "UNRANKED") {
-          updatePlayer(index, "resolvedTier", null);
+          // 언랭이지만 실버4 이하 점수가 적용됨 → 빈 값이 아닌 "UNRANKED"로 저장
+          updatePlayer(index, "resolvedTier", "UNRANKED");
           updatePlayer(index, "resolvedRank", null);
-          updatePlayer(index, "resolvedLabel", "언랭 (S15/S16 모두 기록 없음)");
+          updatePlayer(index, "resolvedLabel", "언랭 → 실버 4 이하 점수 적용");
           updatePlayer(index, "lookupError", null);
         } else {
           const suffix = season ? ` — ${season} 기준` : "";
