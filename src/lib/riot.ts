@@ -145,18 +145,69 @@ const S15_END_SEC = Math.floor(
 );
 
 /**
- * match-v5 ids 페이지네이션으로 S15 솔로랭크(queue=420) 판수 카운트.
- * 한 호출당 최대 100개. 보통 학생은 50~300판이라 1~3 호출.
- * fow와 달리 라이엇 API는 다시하기(remake) 게임도 별도 게임으로 카운트하지만,
- * match id가 부여된 모든 게임이 정식으로 시작된 것이므로 사용자 인식 판수와
- * 보통 일치한다.
+ * 한 매치의 detail을 가져와 다시하기인지 판정.
+ * 다시하기 기준: gameDuration < 300초 OR 본인 참가자가 gameEndedInEarlySurrender=true
+ * (LoL 다시하기는 게임 시작 3분 경과 후 90초 이상 탈주자가 있을 때 가능)
+ */
+async function isRealGame(
+  matchId: string,
+  puuid: string
+): Promise<boolean | null> {
+  const res = await riotFetch(
+    `https://asia.api.riotgames.com/lol/match/v5/matches/${matchId}`
+  );
+  if (!res.ok) return null;
+  type MatchDetail = {
+    info?: {
+      gameDuration?: number;
+      participants?: { puuid: string; gameEndedInEarlySurrender?: boolean }[];
+    };
+  };
+  const m = (await res.json()) as MatchDetail;
+  const dur = m.info?.gameDuration ?? 0;
+  const me = m.info?.participants?.find((p) => p.puuid === puuid);
+  const earlySurr = me?.gameEndedInEarlySurrender ?? false;
+  return dur >= 300 && !earlySurr;
+}
+
+async function fetchDetailsConcurrent(
+  ids: string[],
+  puuid: string,
+  concurrency = 10
+): Promise<number> {
+  // valid 게임 수만 카운트. detail fetch 실패는 conservative하게 valid로 간주.
+  let valid = 0;
+  for (let i = 0; i < ids.length; i += concurrency) {
+    const batch = ids.slice(i, i + concurrency);
+    const results = await Promise.all(
+      batch.map((id) => isRealGame(id, puuid))
+    );
+    for (const r of results) {
+      if (r === null) valid++; // detail 실패 → valid 가정
+      else if (r) valid++;
+    }
+  }
+  return valid;
+}
+
+/**
+ * S15 솔로랭크(queue=420) 판수 — 다시하기 제외.
+ *
+ * 비용 최소화 전략:
+ *   1) match-v5 ids로 모든 솔로 매치 ID 수집 (페이지네이션, 1~6 호출)
+ *   2) ids 개수가 패널티 경계(20/40)에서 멀면 detail 호출 SKIP — ids 그대로 반환
+ *      - ids ≤ 17 → 패널티 +4 확정 (다시하기 빼면 더 적음)
+ *      - ids ≥ 50 → 패널티 0 거의 확정 (다시하기 9개 이하 가정)
+ *   3) ids가 경계 근처(18~22, 38~50)이면 detail 호출로 다시하기 정확히 필터
+ *
+ * 결과: 대부분 유저 1~6회만 호출. 경계 유저만 +5~30회.
  */
 export async function countS15SoloGames(puuid: string): Promise<number | null> {
-  let total = 0;
+  // 1. 매치 ID 수집
+  const allIds: string[] = [];
   let start = 0;
   const PAGE = 100;
-  const MAX_PAGES = 6; // 600판까지 안전 한도
-
+  const MAX_PAGES = 6;
   for (let i = 0; i < MAX_PAGES; i++) {
     const url =
       `https://asia.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids` +
@@ -164,13 +215,23 @@ export async function countS15SoloGames(puuid: string): Promise<number | null> {
       `&start=${start}&count=${PAGE}`;
     const res = await riotFetch(url);
     if (!res.ok) {
-      // 한 번도 못 가져왔으면 null
-      return i === 0 ? null : total;
+      if (i === 0) return null;
+      break;
     }
     const ids: string[] = await res.json();
-    total += ids.length;
-    if (ids.length < PAGE) return total; // 마지막 페이지
+    allIds.push(...ids);
+    if (ids.length < PAGE) break;
     start += PAGE;
   }
-  return total; // 600+ (한도 도달, 어차피 패널티 없음)
+
+  const totalIds = allIds.length;
+  if (totalIds === 0) return 0;
+
+  // 2. ids ≤ 20 또는 > 50 이면 detail skip
+  //    - ≤ 20: 다시하기 빼면 더 적어져도 어차피 ≤20 → 패널티 +4 동일
+  //    - > 50: 다시하기 9개 이하면 41+ → 패널티 0 거의 확정 (트레이드오프)
+  if (totalIds <= 20 || totalIds > 50) return totalIds;
+
+  // 3. ids 21~50: detail로 다시하기 필터
+  return fetchDetailsConcurrent(allIds, puuid);
 }
