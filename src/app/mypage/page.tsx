@@ -37,6 +37,7 @@ export default function MyPage() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
+  const [faToggling, setFaToggling] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -90,6 +91,21 @@ export default function MyPage() {
       setRefreshError(err.error || "갱신 실패");
     }
     setRefreshing(false);
+  };
+
+  const handleToggleFA = async (next: boolean) => {
+    setFaToggling(true);
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isLookingForTeam: next }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setProfile((prev) => (prev ? { ...prev, isLookingForTeam: updated.isLookingForTeam } : prev));
+      setEditForm((prev) => ({ ...prev, isLookingForTeam: updated.isLookingForTeam }));
+    }
+    setFaToggling(false);
   };
 
   const handleSaveProfile = async () => {
@@ -234,26 +250,28 @@ export default function MyPage() {
           </p>
         )}
 
+        {/* FA 마켓 토글 — 항상 노출 (edit mode 무관) */}
+        <label className="flex items-center gap-3 cursor-pointer mb-4 bg-gray-900/50 rounded-lg px-4 py-3 hover:bg-gray-900/70 transition">
+          <input
+            type="checkbox"
+            checked={profile.isLookingForTeam || false}
+            disabled={faToggling}
+            onChange={(e) => handleToggleFA(e.target.checked)}
+            className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-200 font-medium">
+            🎮 FA 마켓에 등록 (팀 찾는 중)
+          </span>
+          {faToggling && (
+            <span className="text-xs text-gray-500 ml-auto">저장 중...</span>
+          )}
+          {!faToggling && profile.isLookingForTeam && (
+            <span className="text-xs text-green-400 ml-auto">노출 중</span>
+          )}
+        </label>
+
         {editMode ? (
           <div className="space-y-4 mt-6 border-t border-gray-700 pt-4">
-            {/* Toggle FA */}
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={editForm.isLookingForTeam}
-                onChange={(e) =>
-                  setEditForm({
-                    ...editForm,
-                    isLookingForTeam: e.target.checked,
-                  })
-                }
-                className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-300">
-                FA 마켓에 등록 (팀 찾는 중)
-              </span>
-            </label>
-
             {/* S15 peak — fow.kr에 없으면 수동 입력 */}
             <div>
               <label className="block text-sm text-gray-400 mb-1">

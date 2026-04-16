@@ -133,6 +133,7 @@ export async function POST(req: Request) {
             ? preferredPositions
             : [],
           bio: bio || null,
+          isLookingForTeam: true, // 가입 시 자동 FA 등록
         },
       });
 
