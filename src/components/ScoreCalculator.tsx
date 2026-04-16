@@ -327,7 +327,7 @@ export default function ScoreCalculator() {
                     />
                   </>
                 ) : (
-                  <div className="flex-1 grid grid-cols-[minmax(0,1fr)_48px_auto] gap-1 items-center min-w-0">
+                  <div className="flex-1 grid grid-cols-[minmax(0,1fr)_auto_44px_auto] gap-1 items-center min-w-0">
                     <input
                       type="text"
                       value={player.gameName}
@@ -335,11 +335,12 @@ export default function ScoreCalculator() {
                       placeholder="닉네임"
                       className={`min-w-0 w-full ${inputCls}`}
                     />
+                    <span className="text-[#6c727f] text-xs">#</span>
                     <input
                       type="text"
                       value={player.tagLine}
                       onChange={(e) => updatePlayer(i, "tagLine", e.target.value)}
-                      placeholder="#KR1"
+                      placeholder="KR1"
                       className={`w-full ${inputCls}`}
                     />
                     <button
