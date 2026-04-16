@@ -20,6 +20,8 @@ export default function RegisterPage() {
     preferredPositions: [] as string[],
     bio: "",
   });
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +44,8 @@ export default function RegisterPage() {
     const phone = form.phoneNumber.replace(/[-\s]/g, "");
     if (!/^010\d{8}$/.test(phone))
       return setError("올바른 휴대폰 번호 형식이 아닙니다 (예: 01012345678).");
+    if (!agreeTerms || !agreePrivacy)
+      return setError("이용약관 및 개인정보 수집·이용에 모두 동의해 주세요.");
 
     setLoading(true);
     try {
@@ -194,6 +198,48 @@ export default function RegisterPage() {
             placeholder="플레이 스타일, 가능 시간 등"
             className={`w-full resize-none ${inputCls}`}
           />
+        </div>
+
+        {/* 약관 동의 */}
+        <div className="space-y-2 pt-2 border-t border-[#232830]">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#e08a3c]"
+            />
+            <span className="text-[12px] text-[#cdd1d8]">
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#e08a3c] hover:underline"
+              >
+                이용약관
+              </a>
+              에 동의합니다 <span className="text-[#e3603f]">(필수)</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreePrivacy}
+              onChange={(e) => setAgreePrivacy(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#e08a3c]"
+            />
+            <span className="text-[12px] text-[#cdd1d8]">
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#e08a3c] hover:underline"
+              >
+                개인정보 수집 및 이용
+              </a>
+              에 동의합니다 <span className="text-[#e3603f]">(필수)</span>
+            </span>
+          </label>
         </div>
 
         <button
