@@ -104,13 +104,16 @@ export default function ScoreCalculator() {
       } else {
         const tier = data.scoreTier as string | null;
         const rank = data.scoreRank as string | null;
+        const season = data.scoreSeason as "S15" | "S16" | null;
         if (!tier || tier === "UNRANKED") {
           updatePlayer(index, "resolvedTier", null);
           updatePlayer(index, "resolvedRank", null);
-          updatePlayer(index, "resolvedLabel", "언랭");
+          updatePlayer(index, "resolvedLabel", "언랭 (S15/S16 모두 기록 없음)");
           updatePlayer(index, "lookupError", null);
         } else {
-          const label = `${TIER_LABELS[tier] ?? tier}${rank ? ` ${rank}` : ""}${data.locked ? " (확정)" : ""}`;
+          const suffix = season ? ` — ${season} 기준` : "";
+          const lock = data.locked && season === "S16" ? " (확정)" : "";
+          const label = `${TIER_LABELS[tier] ?? tier}${rank ? ` ${rank}` : ""}${lock}${suffix}`;
           updatePlayer(index, "resolvedTier", tier);
           updatePlayer(index, "resolvedRank", rank);
           updatePlayer(index, "resolvedLabel", label);

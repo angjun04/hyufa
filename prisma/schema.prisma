@@ -60,6 +60,12 @@ model TierCache {
   peakRankS16 String?
   peakLPS16   Int?
 
+  // S15 peak (fow.lol 크롤 결과). 회원은 User에도 저장.
+  peakTierS15 String?
+  peakRankS15 String?
+  peakLPS15   Int?
+  s15FetchedAt DateTime?
+
   refreshedAt DateTime @updatedAt
   createdAt   DateTime @default(now())
 

@@ -144,6 +144,10 @@ export async function POST(req: Request) {
           peakTierS16: snap.tier === "UNRANKED" ? null : snap.tier,
           peakRankS16: snap.tier === "UNRANKED" ? null : snap.rank || null,
           peakLPS16: snap.tier === "UNRANKED" ? null : snap.lp,
+          peakTierS15: s15Peak.tier,
+          peakRankS15: s15Peak.rank,
+          peakLPS15: s15Peak.lp,
+          s15FetchedAt: new Date(),
         },
         update: {
           gameName,
@@ -151,6 +155,10 @@ export async function POST(req: Request) {
           currentTier: snap.tier,
           currentRank: snap.rank || null,
           currentLP: snap.lp,
+          peakTierS15: s15Peak.tier,
+          peakRankS15: s15Peak.rank,
+          peakLPS15: s15Peak.lp,
+          s15FetchedAt: new Date(),
         },
       });
 

@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // 회원이면 lock 여부 따라 정확한 책정 티어, 비회원이면 cache 기준
+  // S15 peak와 S16 peak 중 max를 점수 책정 티어로 사용
   const score = await resolveScoreTier(cache.puuid);
 
   return NextResponse.json({
@@ -46,9 +46,15 @@ export async function POST(req: Request) {
     tagLine: cache.tagLine,
     currentTier: cache.currentTier,
     currentRank: cache.currentRank,
-    // 점수 책정용 (S16 lock된 peak 또는 진행 중 peak-so-far)
-    scoreTier: score.s16.tier,
-    scoreRank: score.s16.rank,
+    // 점수 책정용 — max(S15, S16)
+    scoreTier: score.best.tier,
+    scoreRank: score.best.rank,
+    scoreSeason: score.bestSeason, // "S15" | "S16" | null
+    // 참고용
+    s16Tier: score.s16.tier,
+    s16Rank: score.s16.rank,
+    s15Tier: score.s15.tier,
+    s15Rank: score.s15.rank,
     locked: score.locked,
     refreshedAt: cache.refreshedAt,
   });
