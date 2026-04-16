@@ -7,10 +7,18 @@ import {
   TIER_LABELS,
   TEAM_POINT_CAP,
   getTierScore,
+  getTierScoreWithPenalty,
+  gamesPenalty,
   POSITIONS,
 } from "@/lib/tierScore";
 
 type InputMode = "tier" | "nickname";
+
+interface SeasonData {
+  tier: string | null;
+  rank: string | null;
+  games: number | null;
+}
 
 interface PlayerSlot {
   position: string;
@@ -18,12 +26,13 @@ interface PlayerSlot {
   // 티어 모드
   tier: string;
   rank: string;
+  games: string; // 판수 텍스트 입력 (빈 문자열이면 패널티 미적용)
   // 닉네임 모드
   gameName: string;
   tagLine: string;
-  resolvedTier: string | null;
-  resolvedRank: string | null;
-  resolvedLabel: string | null; // "Diamond II (확정)" 같은 표시용
+  resolvedS16: SeasonData | null;
+  resolvedS15: SeasonData | null;
+  locked: boolean;
   lookupError: string | null;
   lookupLoading: boolean;
 }
@@ -33,25 +42,119 @@ const emptySlot = (position: string): PlayerSlot => ({
   mode: "tier",
   tier: "",
   rank: "",
+  games: "",
   gameName: "",
   tagLine: "",
-  resolvedTier: null,
-  resolvedRank: null,
-  resolvedLabel: null,
+  resolvedS16: null,
+  resolvedS15: null,
+  locked: false,
   lookupError: null,
   lookupLoading: false,
 });
 
-function scoreOf(p: PlayerSlot): number {
+function normalizedSeasonScore(
+  season: SeasonData | null,
+  position: string
+): { score: number; tier: string | null; rank: string | null; games: number | null } | null {
+  if (!season) return null;
+  const base = getTierScore(season.tier ?? "", season.rank ?? "", position);
+  if (base === 0 && (!season.tier || season.tier === "")) return null;
+  const penalty = gamesPenalty(season.games);
+  return {
+    score: base + penalty,
+    tier: season.tier,
+    rank: season.rank,
+    games: season.games,
+  };
+}
+
+interface ScoreResult {
+  total: number;
+  chosenSeason: "S15" | "S16" | null;
+  chosenTier: string | null;
+  chosenRank: string | null;
+  chosenGames: number | null;
+  penalty: number;
+}
+
+function scoreOf(p: PlayerSlot): ScoreResult {
   if (p.mode === "nickname") {
-    if (!p.resolvedTier) return 0;
-    return getTierScore(p.resolvedTier, p.resolvedRank ?? "", p.position);
+    const s16Raw = p.resolvedS16;
+    const s15Raw = p.resolvedS15;
+    const s16 = normalizedSeasonScore(s16Raw, p.position);
+    const s15 = normalizedSeasonScore(s15Raw, p.position);
+
+    if (!s16 && !s15) {
+      return { total: 0, chosenSeason: null, chosenTier: null, chosenRank: null, chosenGames: null, penalty: 0 };
+    }
+    if (!s16) {
+      return {
+        total: s15!.score,
+        chosenSeason: "S15",
+        chosenTier: s15!.tier,
+        chosenRank: s15!.rank,
+        chosenGames: s15!.games,
+        penalty: gamesPenalty(s15!.games),
+      };
+    }
+    if (!s15) {
+      return {
+        total: s16.score,
+        chosenSeason: "S16",
+        chosenTier: s16.tier,
+        chosenRank: s16.rank,
+        chosenGames: s16.games,
+        penalty: gamesPenalty(s16.games),
+      };
+    }
+
+    // 두 시즌 모두 있으면:
+    //   1) 먼저 티어(base 점수)가 더 높은 쪽 선택
+    //   2) 티어 동률이면 판수 많은 쪽(= 패널티 적은 쪽) 선택
+    const s15Base = s15.score - gamesPenalty(s15.games);
+    const s16Base = s16.score - gamesPenalty(s16.games);
+    let pick: typeof s15;
+    if (s15Base > s16Base) pick = s15;
+    else if (s16Base > s15Base) pick = s16;
+    else {
+      // 동률 — 판수 많은 쪽 (null은 최저 취급)
+      const g15 = s15.games ?? -1;
+      const g16 = s16.games ?? -1;
+      pick = g15 >= g16 ? s15 : s16;
+    }
+    const season: "S15" | "S16" = pick === s15 ? "S15" : "S16";
+    return {
+      total: pick.score,
+      chosenSeason: season,
+      chosenTier: pick.tier,
+      chosenRank: pick.rank,
+      chosenGames: pick.games,
+      penalty: gamesPenalty(pick.games),
+    };
   }
-  if (!p.tier) return 0;
-  if (p.tier === "SILVER_BELOW" || p.tier === "DIAMOND_ABOVE")
-    return getTierScore(p.tier, "", p.position);
-  if (!p.rank) return 0;
-  return getTierScore(p.tier, p.rank, p.position);
+
+  // 티어 모드
+  if (!p.tier) return { total: 0, chosenSeason: null, chosenTier: null, chosenRank: null, chosenGames: null, penalty: 0 };
+  const gamesNum = p.games === "" ? null : parseInt(p.games, 10);
+  const rankForScore =
+    p.tier === "SILVER_BELOW" || p.tier === "DIAMOND_ABOVE" ? "" : p.rank;
+  if (
+    p.tier !== "SILVER_BELOW" &&
+    p.tier !== "DIAMOND_ABOVE" &&
+    p.tier !== "UNRANKED" &&
+    !p.rank
+  ) {
+    return { total: 0, chosenSeason: null, chosenTier: null, chosenRank: null, chosenGames: null, penalty: 0 };
+  }
+  const total = getTierScoreWithPenalty(p.tier, rankForScore, p.position, gamesNum);
+  return {
+    total,
+    chosenSeason: null,
+    chosenTier: p.tier,
+    chosenRank: p.rank || null,
+    chosenGames: gamesNum,
+    penalty: gamesPenalty(gamesNum),
+  };
 }
 
 export default function ScoreCalculator() {
@@ -98,27 +201,13 @@ export default function ScoreCalculator() {
       const data = await res.json();
       if (!res.ok) {
         updatePlayer(index, "lookupError", data.error || "조회 실패");
-        updatePlayer(index, "resolvedTier", null);
-        updatePlayer(index, "resolvedRank", null);
-        updatePlayer(index, "resolvedLabel", null);
+        updatePlayer(index, "resolvedS16", null);
+        updatePlayer(index, "resolvedS15", null);
       } else {
-        const tier = data.scoreTier as string | null;
-        const rank = data.scoreRank as string | null;
-        const season = data.scoreSeason as "S15" | "S16" | null;
-        if (!tier || tier === "UNRANKED") {
-          // 언랭이지만 실버4 이하 점수가 적용됨 → 빈 값이 아닌 "UNRANKED"로 저장
-          updatePlayer(index, "resolvedTier", "UNRANKED");
-          updatePlayer(index, "resolvedRank", null);
-          updatePlayer(index, "resolvedLabel", "언랭 → 실버 4 이하 점수 적용");
-          updatePlayer(index, "lookupError", null);
-        } else {
-          const suffix = season ? ` — ${season} 기준` : "";
-          const lock = data.locked && season === "S16" ? " (확정)" : "";
-          const label = `${TIER_LABELS[tier] ?? tier}${rank ? ` ${rank}` : ""}${lock}${suffix}`;
-          updatePlayer(index, "resolvedTier", tier);
-          updatePlayer(index, "resolvedRank", rank);
-          updatePlayer(index, "resolvedLabel", label);
-        }
+        updatePlayer(index, "resolvedS16", data.s16);
+        updatePlayer(index, "resolvedS15", data.s15);
+        updatePlayer(index, "locked", !!data.locked);
+        updatePlayer(index, "lookupError", null);
       }
     } catch {
       updatePlayer(index, "lookupError", "조회 중 오류가 발생했습니다.");
@@ -127,8 +216,8 @@ export default function ScoreCalculator() {
     }
   };
 
-  const scores = players.map(scoreOf);
-  const totalScore = scores.reduce((a, b) => a + b, 0);
+  const results = players.map(scoreOf);
+  const totalScore = results.reduce((a, b) => a + b.total, 0);
   const remaining = TEAM_POINT_CAP - totalScore;
   const isOverCap = remaining < 0;
 
@@ -150,7 +239,8 @@ export default function ScoreCalculator() {
         </div>
       </div>
       <p className="text-xs text-gray-500 mb-5">
-        티어를 직접 선택하거나, 닉네임으로 자동 조회할 수 있습니다.
+        판수 패널티: 20판 이하 +4, 40판 이하 +2. 닉네임 모드는 S15/S16 중 유리한
+        쪽 자동 선택.
       </p>
 
       {/* Progress bar */}
@@ -172,14 +262,11 @@ export default function ScoreCalculator() {
       <div className="space-y-3">
         {players.map((player, i) => {
           const posInfo = POSITIONS.find((p) => p.value === player.position);
+          const result = results[i];
 
           return (
-            <div
-              key={i}
-              className="bg-gray-900/50 rounded-lg p-3"
-            >
+            <div key={i} className="bg-gray-900/50 rounded-lg p-3">
               <div className="flex items-center gap-3">
-                {/* Position */}
                 <div className="w-16 text-center shrink-0">
                   <span className="text-lg">{posInfo?.icon || "?"}</span>
                   <p className="text-xs text-gray-400 mt-0.5">
@@ -187,7 +274,6 @@ export default function ScoreCalculator() {
                   </p>
                 </div>
 
-                {/* Mode toggle */}
                 <div className="flex flex-col gap-1 shrink-0">
                   <button
                     type="button"
@@ -217,10 +303,8 @@ export default function ScoreCalculator() {
                   <>
                     <select
                       value={player.tier}
-                      onChange={(e) =>
-                        updatePlayer(i, "tier", e.target.value)
-                      }
-                      className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                      onChange={(e) => updatePlayer(i, "tier", e.target.value)}
+                      className="flex-1 min-w-0 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
                     >
                       <option value="">티어 선택</option>
                       <option value="SILVER_BELOW">실버 4 이하</option>
@@ -248,7 +332,7 @@ export default function ScoreCalculator() {
                           onChange={(e) =>
                             updatePlayer(i, "rank", e.target.value)
                           }
-                          className="w-20 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                          className="w-16 bg-gray-700 border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
                         >
                           <option value="">단계</option>
                           {(player.tier === "DIAMOND"
@@ -261,9 +345,19 @@ export default function ScoreCalculator() {
                           ))}
                         </select>
                       )}
+
+                    <input
+                      type="number"
+                      min={0}
+                      value={player.games}
+                      onChange={(e) => updatePlayer(i, "games", e.target.value)}
+                      placeholder="판수"
+                      title="해당 티어 달성 시즌 판수 (비우면 패널티 없음)"
+                      className="w-16 bg-gray-700 border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                    />
                   </>
                 ) : (
-                  <div className="flex-1 flex gap-1">
+                  <div className="flex-1 flex gap-1 min-w-0">
                     <input
                       type="text"
                       value={player.gameName}
@@ -294,23 +388,41 @@ export default function ScoreCalculator() {
                   </div>
                 )}
 
-                {/* Score */}
                 <div className="w-16 text-right shrink-0">
-                  <span className="text-yellow-400 font-bold">{scores[i]}</span>
+                  <span className="text-yellow-400 font-bold">
+                    {result.total}
+                  </span>
                   <span className="text-gray-500 text-xs">점</span>
                 </div>
               </div>
 
-              {/* Nickname mode result/error */}
-              {player.mode === "nickname" && (player.resolvedLabel || player.lookupError) && (
-                <div className="ml-[120px] mt-2">
-                  {player.resolvedLabel && !player.lookupError && (
-                    <p className="text-xs text-gray-300">
-                      → {player.resolvedLabel}
+              {/* 결과 / 에러 영역 */}
+              {((player.mode === "nickname" &&
+                (result.chosenSeason || player.lookupError)) ||
+                (player.mode === "tier" && result.penalty > 0)) && (
+                <div className="ml-[120px] mt-2 text-xs">
+                  {player.lookupError && (
+                    <p className="text-red-400">{player.lookupError}</p>
+                  )}
+                  {!player.lookupError && player.mode === "nickname" && result.chosenSeason && (
+                    <p className="text-gray-300">
+                      → {result.chosenSeason} 기준{" "}
+                      {result.chosenTier && result.chosenTier !== "UNRANKED"
+                        ? `${TIER_LABELS[result.chosenTier] ?? result.chosenTier}${result.chosenRank ? ` ${result.chosenRank}` : ""}`
+                        : "언랭 (실4 이하 점수)"}
+                      {result.chosenGames != null && ` · ${result.chosenGames}판`}
+                      {result.penalty > 0 && (
+                        <span className="text-red-400">
+                          {" "}· 판수 패널티 +{result.penalty}
+                        </span>
+                      )}
+                      {player.locked && result.chosenSeason === "S16" && " (확정)"}
                     </p>
                   )}
-                  {player.lookupError && (
-                    <p className="text-xs text-red-400">{player.lookupError}</p>
+                  {!player.lookupError && player.mode === "tier" && result.penalty > 0 && (
+                    <p className="text-red-400">
+                      판수 {player.games}판 → 패널티 +{result.penalty}
+                    </p>
                   )}
                 </div>
               )}
@@ -320,9 +432,7 @@ export default function ScoreCalculator() {
       </div>
 
       <button
-        onClick={() =>
-          setPlayers(POSITIONS.map((p) => emptySlot(p.value)))
-        }
+        onClick={() => setPlayers(POSITIONS.map((p) => emptySlot(p.value)))}
         className="mt-4 text-sm text-gray-400 hover:text-white transition"
       >
         초기화

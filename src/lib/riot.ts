@@ -33,6 +33,9 @@ export interface RankSnapshot {
   tier: string;
   rank: string;
   lp: number;
+  wins: number;
+  losses: number;
+  games: number; // wins + losses
 }
 
 export class RiotApiError extends Error {
@@ -108,12 +111,17 @@ export async function getRankedInfo(
   const entries = await getLeagueEntriesByPuuid(account.puuid);
   const soloQueue = entries.find((e) => e.queueType === "RANKED_SOLO_5x5");
 
+  const wins = soloQueue?.wins ?? 0;
+  const losses = soloQueue?.losses ?? 0;
   return {
     puuid: account.puuid,
     summonerId: summoner?.id ?? "",
     tier: soloQueue?.tier || "UNRANKED",
     rank: soloQueue?.rank || "",
     lp: soloQueue?.leaguePoints || 0,
+    wins,
+    losses,
+    games: wins + losses,
   };
 }
 

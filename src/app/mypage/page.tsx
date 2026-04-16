@@ -33,6 +33,7 @@ export default function MyPage() {
     isLookingForTeam: false,
     peakTierS15: "",
     peakRankS15: "",
+    gamesS15: "",
   });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
@@ -55,6 +56,7 @@ export default function MyPage() {
             isLookingForTeam: data.isLookingForTeam || false,
             peakTierS15: data.peakTierS15 || "",
             peakRankS15: data.peakRankS15 || "",
+            gamesS15: data.gamesS15 != null ? String(data.gamesS15) : "",
           });
         });
       fetch("/api/contact")
@@ -91,10 +93,15 @@ export default function MyPage() {
   };
 
   const handleSaveProfile = async () => {
+    const payload = {
+      ...editForm,
+      gamesS15:
+        editForm.gamesS15 === "" ? null : parseInt(editForm.gamesS15, 10),
+    };
     const res = await fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editForm),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
       const updated = await res.json();
@@ -193,14 +200,29 @@ export default function MyPage() {
             <div className="mt-1">
               <TierBadge tier={profile.peakTierS16} rank={profile.peakRankS16} />
             </div>
+            {profile.gamesS16 != null && (
+              <p className="text-[10px] text-gray-500 mt-1">
+                {profile.gamesS16}판
+              </p>
+            )}
           </div>
           <div>
             <span className="text-xs text-gray-500">
-              S15 최고{profile.peakSourceS15 === "fow" ? " (fow.kr)" : ""}
+              S15 최고
+              {profile.peakSourceS15 === "fow"
+                ? " (fow.kr)"
+                : profile.peakSourceS15 === "manual"
+                  ? " (수동)"
+                  : ""}
             </span>
             <div className="mt-1">
               <TierBadge tier={profile.peakTierS15} rank={profile.peakRankS15} />
             </div>
+            {profile.gamesS15 != null && (
+              <p className="text-[10px] text-gray-500 mt-1">
+                {profile.gamesS15}판
+              </p>
+            )}
           </div>
         </div>
 
@@ -287,6 +309,21 @@ export default function MyPage() {
                       ))}
                     </select>
                   )}
+              </div>
+              <div className="mt-2">
+                <label className="block text-xs text-gray-500 mb-1">
+                  S15 솔로랭크 판수 (fow 자동 값이 틀리면 직접 입력)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editForm.gamesS15}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, gamesS15: e.target.value })
+                  }
+                  placeholder="예: 50"
+                  className="w-32 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white"
+                />
               </div>
             </div>
 

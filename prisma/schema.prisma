@@ -22,11 +22,13 @@ model User {
   peakTierS15   String?
   peakRankS15   String?
   peakSourceS15 String? // "fow" | "manual"
+  gamesS15      Int?    // S15 솔로랭크 판수 (match-v5 카운트 결과, 41이면 "41+" 의미)
 
   // S16 (2026) peak — 어드민이 정한 마감 시점에 lock
   peakTierS16Locked String?
   peakRankS16Locked String?
   peakLPS16Locked   Int?
+  gamesS16Locked    Int?
   peakLockedAt      DateTime?
 
   preferredPositions String[] @default([])
@@ -54,6 +56,7 @@ model TierCache {
   currentTier String?
   currentRank String?
   currentLP   Int?
+  gamesS16    Int?    // wins + losses (league-v4)
 
   // 시즌 진행 중 누적 max — lock 시 User로 복사
   peakTierS16 String?
@@ -64,6 +67,7 @@ model TierCache {
   peakTierS15 String?
   peakRankS15 String?
   peakLPS15   Int?
+  gamesS15    Int?     // 41이면 "41+" 의미
   s15FetchedAt DateTime?
 
   refreshedAt DateTime @updatedAt

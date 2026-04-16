@@ -1,5 +1,5 @@
-// 점수계산기 닉네임 모드 — 닉네임 → 점수 책정용 티어 반환
-// 캐시 우선, miss/stale일 때만 라이엇 API 호출.
+// 점수계산기 닉네임 모드 — 닉네임 → 점수 책정용 티어/판수 반환
+// 캐시 우선, miss/stale일 때만 라이엇 API / fow 호출.
 
 import { NextResponse } from "next/server";
 import { getOrRefreshTierByRiotId, resolveScoreTier } from "@/lib/tierService";
@@ -38,7 +38,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // S15 peak와 S16 peak 중 max를 점수 책정 티어로 사용
   const score = await resolveScoreTier(cache.puuid);
 
   return NextResponse.json({
@@ -46,16 +45,18 @@ export async function POST(req: Request) {
     tagLine: cache.tagLine,
     currentTier: cache.currentTier,
     currentRank: cache.currentRank,
-    // 점수 책정용 — max(S15, S16)
-    scoreTier: score.best.tier,
-    scoreRank: score.best.rank,
-    scoreSeason: score.bestSeason, // "S15" | "S16" | null
-    // 참고용
-    s16Tier: score.s16.tier,
-    s16Rank: score.s16.rank,
-    s15Tier: score.s15.tier,
-    s15Rank: score.s15.rank,
     locked: score.locked,
     refreshedAt: cache.refreshedAt,
+    // 두 시즌 모두 반환 → 클라이언트가 포지션별로 점수+패널티 계산 후 min 선택
+    s16: {
+      tier: score.s16.tier,
+      rank: score.s16.rank,
+      games: score.s16.games,
+    },
+    s15: {
+      tier: score.s15.tier,
+      rank: score.s15.rank,
+      games: score.s15.games,
+    },
   });
 }

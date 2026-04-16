@@ -3,7 +3,7 @@
 
 import { prisma } from "./prisma";
 import { getAccountByRiotId, getRankedInfo } from "./riot";
-import { fetchPeakFromFow } from "./fow";
+import { fetchS15SummaryFromFow } from "./fow";
 import { TIER_DIVISION_ORDER } from "./tierScore";
 import { isS16Locked } from "./settings";
 import type { TierCache } from "@prisma/client";
@@ -17,21 +17,20 @@ export interface TierInfo {
   lp: number | null;
 }
 
-export interface TierResolveResult {
-  // 점수 책정에 실제로 사용할 값 — max(S15, S16)
-  best: TierInfo;
-  bestSeason: "S15" | "S16" | null;
-  // 원본 (UI 표시용)
-  s16: TierInfo;
-  s15: TierInfo;
+export interface TierWithGames extends TierInfo {
+  games: number | null;
+}
+
+export interface ScoreResolveResult {
+  // 시즌별 티어 + 판수 — UI에서 포지션별 점수/패널티 계산에 사용
+  s16: TierWithGames;
+  s15: TierWithGames;
   locked: boolean;
 }
 
 function tierDivisionRank(tier: string | null, rank: string | null): number {
   if (!tier || tier === "UNRANKED") return -1;
-  // 아이언/브론즈는 실버4로 간주 (LCMC 점수표상 같은 점수)
   if (tier === "IRON" || tier === "BRONZE") return 0;
-  // 마스터 이상은 division 무시
   if (tier === "MASTER" || tier === "GRANDMASTER" || tier === "CHALLENGER") {
     return (
       TIER_DIVISION_ORDER.length +
@@ -58,7 +57,7 @@ function isStale(refreshedAt: Date, staleSeconds: number): boolean {
 }
 
 /**
- * 처음 보는 PUUID에 대해 S15 peak를 fow.lol에서 가져와 캐시에 저장.
+ * 처음 보는 PUUID에 대해 S15 peak + 판수를 fow.lol에서 가져와 캐시에 저장.
  * 실패해도 예외 던지지 않음.
  */
 async function ensureS15CachedFor(
@@ -68,33 +67,31 @@ async function ensureS15CachedFor(
 ): Promise<void> {
   const existing = await prisma.tierCache.findUnique({
     where: { puuid },
-    select: { s15FetchedAt: true, peakTierS15: true },
+    select: { s15FetchedAt: true },
   });
-  // 이미 시도한 적 있으면 재시도 안 함 (null도 "시도 후 없음"의 결과일 수 있음)
   if (existing?.s15FetchedAt) return;
 
-  const s15 = await fetchPeakFromFow(gameName, tagLine, "S15").catch(() => ({
-    tier: null,
-    rank: null,
-    lp: null,
-  }));
+  const summary = await fetchS15SummaryFromFow(gameName, tagLine).catch(
+    () => ({ peak: { tier: null, rank: null, lp: null }, gamesS15: null })
+  );
 
-  // upsert — 캐시 row가 없어도 만들어두기
   await prisma.tierCache.upsert({
     where: { puuid },
     create: {
       puuid,
       gameName,
       tagLine,
-      peakTierS15: s15.tier,
-      peakRankS15: s15.rank,
-      peakLPS15: s15.lp,
+      peakTierS15: summary.peak.tier,
+      peakRankS15: summary.peak.rank,
+      peakLPS15: summary.peak.lp,
+      gamesS15: summary.gamesS15,
       s15FetchedAt: new Date(),
     },
     update: {
-      peakTierS15: s15.tier,
-      peakRankS15: s15.rank,
-      peakLPS15: s15.lp,
+      peakTierS15: summary.peak.tier,
+      peakRankS15: summary.peak.rank,
+      peakLPS15: summary.peak.lp,
+      gamesS15: summary.gamesS15,
       s15FetchedAt: new Date(),
     },
   });
@@ -102,7 +99,6 @@ async function ensureS15CachedFor(
 
 /**
  * PUUID 기반 캐시 우선 조회. stale이거나 force면 라이엇 API 호출.
- * 라이엇 호출 결과는 TierCache에 upsert되며 peak는 누적 max로 갱신된다.
  */
 export async function getOrRefreshTierByPuuid(
   puuid: string,
@@ -116,7 +112,6 @@ export async function getOrRefreshTierByPuuid(
     const tooFresh = !isStale(cached.refreshedAt, FORCE_THROTTLE_SECONDS);
     if (opts.force && tooFresh) return cached;
     if (!opts.force && !isStale(cached.refreshedAt, stale)) {
-      // 캐시 신선해도 S15 fetch 미완이면 한 번 해두기 (한 번만)
       if (!cached.s15FetchedAt) {
         await ensureS15CachedFor(puuid, meta.gameName, meta.tagLine);
         const refreshed = await prisma.tierCache.findUnique({ where: { puuid } });
@@ -145,23 +140,21 @@ export async function getOrRefreshTierByPuuid(
   const shouldUpdatePeak =
     !locked && compareTier(newCurrent, existingPeak) > 0;
 
-  // S15가 아직 안 채워졌으면 이 김에 같이
-  let s15Update: {
-    peakTierS15?: string | null;
-    peakRankS15?: string | null;
-    peakLPS15?: number | null;
-    s15FetchedAt?: Date;
-  } = {};
+  // S15 요약 (peak + games) — 아직 안 채워졌으면 함께
+  let s15Update: Partial<TierCache> = {};
   if (!cached?.s15FetchedAt) {
-    const s15 = await fetchPeakFromFow(
+    const summary = await fetchS15SummaryFromFow(
       meta.gameName,
-      meta.tagLine,
-      "S15"
-    ).catch(() => ({ tier: null, rank: null, lp: null }));
+      meta.tagLine
+    ).catch(() => ({
+      peak: { tier: null, rank: null, lp: null },
+      gamesS15: null,
+    }));
     s15Update = {
-      peakTierS15: s15.tier,
-      peakRankS15: s15.rank,
-      peakLPS15: s15.lp,
+      peakTierS15: summary.peak.tier,
+      peakRankS15: summary.peak.rank,
+      peakLPS15: summary.peak.lp,
+      gamesS15: summary.gamesS15,
       s15FetchedAt: new Date(),
     };
   }
@@ -175,6 +168,7 @@ export async function getOrRefreshTierByPuuid(
       currentTier: snap.tier,
       currentRank: snap.rank || null,
       currentLP: snap.lp,
+      gamesS16: snap.games,
       peakTierS16: snap.tier === "UNRANKED" ? null : snap.tier,
       peakRankS16: snap.tier === "UNRANKED" ? null : snap.rank || null,
       peakLPS16: snap.tier === "UNRANKED" ? null : snap.lp,
@@ -186,6 +180,7 @@ export async function getOrRefreshTierByPuuid(
       currentTier: snap.tier,
       currentRank: snap.rank || null,
       currentLP: snap.lp,
+      gamesS16: snap.games,
       ...(shouldUpdatePeak
         ? {
             peakTierS16: newCurrent.tier,
@@ -214,7 +209,6 @@ export async function getOrRefreshTierByRiotId(
     !opts.force &&
     !isStale(cached.refreshedAt, opts.staleSeconds ?? DEFAULT_STALE_SECONDS)
   ) {
-    // S15 미완이면 한 번
     if (!cached.s15FetchedAt) {
       await ensureS15CachedFor(cached.puuid, gameName, tagLine);
       return prisma.tierCache.findUnique({ where: { puuid: cached.puuid } });
@@ -233,19 +227,19 @@ export async function getOrRefreshTierByRiotId(
 }
 
 /**
- * 점수 책정에 사용할 "확정 티어" — S15 peak 와 S16 peak 중 더 높은 쪽.
+ * 점수 책정을 위한 두 시즌 티어+판수 반환.
+ * 포지션별 점수 계산은 클라이언트에서 (계산기 UI가 포지션을 알고 있음).
  *
  * 회원:
- *   - S16: lock됐으면 User.peakTierS16Locked, 아니면 TierCache.peakTierS16
- *   - S15: User.peakTierS15 (fow 크롤 결과가 가입 시 저장됨)
- *
+ *   S16: lock됐으면 User 스냅샷, 아니면 캐시 (peak-so-far + current games)
+ *   S15: User.peakTierS15/gamesS15 (가입 시 저장)
  * 비회원:
- *   - S16: TierCache.peakTierS16 (없으면 currentTier)
- *   - S15: TierCache.peakTierS15 (fow 크롤)
+ *   S16: 캐시의 peak/현재 + gamesS16
+ *   S15: 캐시의 peakTierS15 + gamesS15 (fow 조회)
  */
 export async function resolveScoreTier(
   puuid: string
-): Promise<TierResolveResult> {
+): Promise<ScoreResolveResult> {
   const [user, cache] = await Promise.all([
     prisma.user.findUnique({ where: { puuid } }),
     prisma.tierCache.findUnique({ where: { puuid } }),
@@ -254,41 +248,39 @@ export async function resolveScoreTier(
   const locked = !!user?.peakLockedAt;
 
   // S16
-  let s16: TierInfo;
+  let s16: TierWithGames;
   if (locked && user) {
     s16 = {
       tier: user.peakTierS16Locked,
       rank: user.peakRankS16Locked,
       lp: user.peakLPS16Locked,
+      games: user.gamesS16Locked,
     };
   } else if (cache) {
     s16 = {
       tier: cache.peakTierS16 ?? cache.currentTier,
       rank: cache.peakRankS16 ?? cache.currentRank,
       lp: cache.peakLPS16 ?? cache.currentLP,
+      games: cache.gamesS16,
     };
   } else {
-    s16 = { tier: null, rank: null, lp: null };
+    s16 = { tier: null, rank: null, lp: null, games: null };
   }
 
   // S15
-  const s15: TierInfo = user
-    ? { tier: user.peakTierS15, rank: user.peakRankS15, lp: null }
+  const s15: TierWithGames = user
+    ? {
+        tier: user.peakTierS15,
+        rank: user.peakRankS15,
+        lp: null,
+        games: user.gamesS15,
+      }
     : {
         tier: cache?.peakTierS15 ?? null,
         rank: cache?.peakRankS15 ?? null,
         lp: cache?.peakLPS15 ?? null,
+        games: cache?.gamesS15 ?? null,
       };
 
-  // 더 높은 쪽을 best로 선택
-  const cmp = compareTier(s15, s16);
-  const best = cmp > 0 ? s15 : s16;
-  const bestSeason: "S15" | "S16" | null =
-    tierDivisionRank(best.tier, best.rank) < 0
-      ? null
-      : cmp > 0
-        ? "S15"
-        : "S16";
-
-  return { best, bestSeason, s16, s15, locked };
+  return { s16, s15, locked };
 }

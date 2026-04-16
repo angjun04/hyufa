@@ -3,6 +3,34 @@
 
 export const TEAM_POINT_CAP = 170;
 
+/**
+ * 판수 패널티:
+ *   - 20판 이하 → +4
+ *   - 20 초과 40판 이하 → +2
+ *   - 40 초과 → 0
+ *   - null/undefined → 0 (판수 모름)
+ */
+export function gamesPenalty(games: number | null | undefined): number {
+  if (games == null) return 0;
+  if (games <= 20) return 4;
+  if (games <= 40) return 2;
+  return 0;
+}
+
+/**
+ * 최종 점수 = baseScore(tier, rank, position) + gamesPenalty(games).
+ */
+export function getTierScoreWithPenalty(
+  tier: string,
+  rank: string,
+  position: string,
+  games: number | null | undefined
+): number {
+  const base = getTierScore(tier, rank, position);
+  if (base === 0) return 0; // 티어 미입력/ 잘못된 경우 0점, 패널티도 더하지 않음
+  return base + gamesPenalty(games);
+}
+
 // 티어 순서 (낮은 → 높은)
 export const TIER_DIVISION_ORDER = [
   "SILVER_IV",

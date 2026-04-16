@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getRankedInfo } from "@/lib/riot";
-import { fetchPeakFromFow } from "@/lib/fow";
+import { fetchS15SummaryFromFow } from "@/lib/fow";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{4,20}$/;
 const PHONE_RE = /^010\d{8}$/;
@@ -102,12 +102,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // ---- S15 peak (fow.lol) — 실패해도 가입 진행 ----
-    const s15Peak = await fetchPeakFromFow(gameName, tagLine, "S15").catch(() => ({
-      tier: null,
-      rank: null,
-      lp: null,
-    }));
+    // ---- S15 peak + 판수 (fow.lol) — 실패해도 가입 진행 ----
+    const s15Summary = await fetchS15SummaryFromFow(gameName, tagLine).catch(
+      () => ({
+        peak: { tier: null, rank: null, lp: null },
+        gamesS15: null,
+      })
+    );
+    const s15Peak = s15Summary.peak;
+    const gamesS15 = s15Summary.gamesS15;
 
     const hashedPassword = await hash(password, 12);
 
@@ -125,6 +128,7 @@ export async function POST(req: Request) {
           peakTierS15: s15Peak.tier,
           peakRankS15: s15Peak.rank,
           peakSourceS15: s15Peak.tier ? "fow" : null,
+          gamesS15: gamesS15,
           preferredPositions: Array.isArray(preferredPositions)
             ? preferredPositions
             : [],
@@ -141,12 +145,14 @@ export async function POST(req: Request) {
           currentTier: snap.tier,
           currentRank: snap.rank || null,
           currentLP: snap.lp,
+          gamesS16: snap.games,
           peakTierS16: snap.tier === "UNRANKED" ? null : snap.tier,
           peakRankS16: snap.tier === "UNRANKED" ? null : snap.rank || null,
           peakLPS16: snap.tier === "UNRANKED" ? null : snap.lp,
           peakTierS15: s15Peak.tier,
           peakRankS15: s15Peak.rank,
           peakLPS15: s15Peak.lp,
+          gamesS15: gamesS15,
           s15FetchedAt: new Date(),
         },
         update: {
@@ -155,9 +161,11 @@ export async function POST(req: Request) {
           currentTier: snap.tier,
           currentRank: snap.rank || null,
           currentLP: snap.lp,
+          gamesS16: snap.games,
           peakTierS15: s15Peak.tier,
           peakRankS15: s15Peak.rank,
           peakLPS15: s15Peak.lp,
+          gamesS15: gamesS15,
           s15FetchedAt: new Date(),
         },
       });

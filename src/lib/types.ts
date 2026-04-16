@@ -12,11 +12,13 @@ export interface UserProfile {
   peakTierS16: string | null;
   peakRankS16: string | null;
   peakLPS16: number | null;
+  gamesS16: number | null;
   peakLockedAt: string | null;
   // S15 peak — fow.kr 크롤 결과 (영구)
   peakTierS15: string | null;
   peakRankS15: string | null;
   peakSourceS15: string | null;
+  gamesS15: number | null;
   // 캐시 메타
   refreshedAt: string | null;
   preferredPositions: string[];

@@ -22,9 +22,11 @@ export async function GET() {
       peakTierS15: true,
       peakRankS15: true,
       peakSourceS15: true,
+      gamesS15: true,
       peakTierS16Locked: true,
       peakRankS16Locked: true,
       peakLPS16Locked: true,
+      gamesS16Locked: true,
       peakLockedAt: true,
       preferredPositions: true,
       bio: true,
@@ -47,6 +49,7 @@ export async function GET() {
     currentTier: cache?.currentTier ?? null,
     currentRank: cache?.currentRank ?? null,
     currentLP: cache?.currentLP ?? null,
+    gamesS16: user.peakLockedAt ? user.gamesS16Locked : cache?.gamesS16 ?? null,
     peakTierS16: user.peakLockedAt ? user.peakTierS16Locked : cache?.peakTierS16 ?? null,
     peakRankS16: user.peakLockedAt ? user.peakRankS16Locked : cache?.peakRankS16 ?? null,
     peakLPS16: user.peakLockedAt ? user.peakLPS16Locked : cache?.peakLPS16 ?? null,
@@ -54,6 +57,7 @@ export async function GET() {
     peakTierS15: user.peakTierS15,
     peakRankS15: user.peakRankS15,
     peakSourceS15: user.peakSourceS15,
+    gamesS15: user.gamesS15,
     refreshedAt: cache?.refreshedAt ?? null,
     preferredPositions: user.preferredPositions,
     bio: user.bio,
@@ -78,6 +82,7 @@ export async function PATCH(req: Request) {
     isLookingForTeam,
     peakTierS15,
     peakRankS15,
+    gamesS15,
   } = body;
 
   // S15 peak 검증
@@ -130,6 +135,23 @@ export async function PATCH(req: Request) {
     }
   }
 
+  // S15 판수 수동 입력 (0 이상 정수, null로 초기화 가능)
+  let gamesS15Update: { gamesS15?: number | null } = {};
+  if (gamesS15 !== undefined) {
+    if (gamesS15 === null || gamesS15 === "") {
+      gamesS15Update = { gamesS15: null };
+    } else {
+      const n = parseInt(String(gamesS15), 10);
+      if (!Number.isFinite(n) || n < 0 || n > 99999) {
+        return NextResponse.json(
+          { error: "판수는 0 이상 99999 이하 정수여야 합니다." },
+          { status: 400 }
+        );
+      }
+      gamesS15Update = { gamesS15: n };
+    }
+  }
+
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data: {
@@ -137,6 +159,7 @@ export async function PATCH(req: Request) {
       ...(bio !== undefined && { bio }),
       ...(isLookingForTeam !== undefined && { isLookingForTeam }),
       ...s15Update,
+      ...gamesS15Update,
     },
     select: {
       id: true,
@@ -146,6 +169,7 @@ export async function PATCH(req: Request) {
       peakTierS15: true,
       peakRankS15: true,
       peakSourceS15: true,
+      gamesS15: true,
     },
   });
 
