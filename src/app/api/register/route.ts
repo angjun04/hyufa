@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { getRankedInfo } from "@/lib/riot";
-import { fetchS15SummaryFromFow } from "@/lib/fow";
+import { getRankedInfo, countS15SoloGames } from "@/lib/riot";
+import { fetchPeakFromFow } from "@/lib/fow";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{4,20}$/;
 const PHONE_RE = /^010\d{8}$/;
@@ -102,15 +102,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // ---- S15 peak + 판수 (fow.lol) — 실패해도 가입 진행 ----
-    const s15Summary = await fetchS15SummaryFromFow(gameName, tagLine).catch(
-      () => ({
-        peak: { tier: null, rank: null, lp: null },
-        gamesS15: null,
-      })
-    );
-    const s15Peak = s15Summary.peak;
-    const gamesS15 = s15Summary.gamesS15;
+    // ---- S15 peak (fow) + 판수 (riot match-v5) — 실패해도 가입 진행 ----
+    const [s15Peak, gamesS15] = await Promise.all([
+      fetchPeakFromFow(gameName, tagLine).catch(() => ({
+        tier: null,
+        rank: null,
+        lp: null,
+      })),
+      countS15SoloGames(snap.puuid).catch(() => null),
+    ]);
 
     const hashedPassword = await hash(password, 12);
 

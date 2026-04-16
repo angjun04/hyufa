@@ -2,8 +2,8 @@
 // 라이엇 API 호출을 최소화하기 위한 단일 진입점.
 
 import { prisma } from "./prisma";
-import { getAccountByRiotId, getRankedInfo } from "./riot";
-import { fetchS15SummaryFromFow } from "./fow";
+import { getAccountByRiotId, getRankedInfo, countS15SoloGames } from "./riot";
+import { fetchPeakFromFow } from "./fow";
 import { TIER_DIVISION_ORDER } from "./tierScore";
 import { isS16Locked } from "./settings";
 import type { TierCache } from "@prisma/client";
@@ -71,9 +71,15 @@ async function ensureS15CachedFor(
   });
   if (existing?.s15FetchedAt) return;
 
-  const summary = await fetchS15SummaryFromFow(gameName, tagLine).catch(
-    () => ({ peak: { tier: null, rank: null, lp: null }, gamesS15: null })
-  );
+  // peak (fow) + 판수 (riot match-v5) 병렬 조회
+  const [peak, gamesS15] = await Promise.all([
+    fetchPeakFromFow(gameName, tagLine).catch(() => ({
+      tier: null,
+      rank: null,
+      lp: null,
+    })),
+    countS15SoloGames(puuid).catch(() => null),
+  ]);
 
   await prisma.tierCache.upsert({
     where: { puuid },
@@ -81,17 +87,17 @@ async function ensureS15CachedFor(
       puuid,
       gameName,
       tagLine,
-      peakTierS15: summary.peak.tier,
-      peakRankS15: summary.peak.rank,
-      peakLPS15: summary.peak.lp,
-      gamesS15: summary.gamesS15,
+      peakTierS15: peak.tier,
+      peakRankS15: peak.rank,
+      peakLPS15: peak.lp,
+      gamesS15: gamesS15,
       s15FetchedAt: new Date(),
     },
     update: {
-      peakTierS15: summary.peak.tier,
-      peakRankS15: summary.peak.rank,
-      peakLPS15: summary.peak.lp,
-      gamesS15: summary.gamesS15,
+      peakTierS15: peak.tier,
+      peakRankS15: peak.rank,
+      peakLPS15: peak.lp,
+      gamesS15: gamesS15,
       s15FetchedAt: new Date(),
     },
   });
@@ -140,21 +146,22 @@ export async function getOrRefreshTierByPuuid(
   const shouldUpdatePeak =
     !locked && compareTier(newCurrent, existingPeak) > 0;
 
-  // S15 요약 (peak + games) — 아직 안 채워졌으면 함께
+  // S15 peak (fow) + 판수 (riot match-v5) — 아직 안 채워졌으면 함께
   let s15Update: Partial<TierCache> = {};
   if (!cached?.s15FetchedAt) {
-    const summary = await fetchS15SummaryFromFow(
-      meta.gameName,
-      meta.tagLine
-    ).catch(() => ({
-      peak: { tier: null, rank: null, lp: null },
-      gamesS15: null,
-    }));
+    const [peak, gamesS15] = await Promise.all([
+      fetchPeakFromFow(meta.gameName, meta.tagLine).catch(() => ({
+        tier: null,
+        rank: null,
+        lp: null,
+      })),
+      countS15SoloGames(puuid).catch(() => null),
+    ]);
     s15Update = {
-      peakTierS15: summary.peak.tier,
-      peakRankS15: summary.peak.rank,
-      peakLPS15: summary.peak.lp,
-      gamesS15: summary.gamesS15,
+      peakTierS15: peak.tier,
+      peakRankS15: peak.rank,
+      peakLPS15: peak.lp,
+      gamesS15: gamesS15,
       s15FetchedAt: new Date(),
     };
   }

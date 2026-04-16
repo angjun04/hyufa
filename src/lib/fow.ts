@@ -1,4 +1,6 @@
-// fow.lol 크롤러 — S15(2025) peak 티어 + 솔로랭크 판수 조회
+// fow.lol 크롤러 — S15(2025) peak 티어 조회
+// 라이엇 공식 API는 종료된 시즌의 peak를 제공하지 않으므로 fow에서 가져온다.
+// (S15 솔로 판수는 fow API 페이지네이션이 안 돼서 라이엇 match-v5 사용 — riot.ts)
 
 import * as cheerio from "cheerio";
 
@@ -6,11 +8,6 @@ export interface FowPeakResult {
   tier: string | null;
   rank: string | null;
   lp: number | null;
-}
-
-export interface FowSummary {
-  peak: FowPeakResult;
-  gamesS15: number | null; // S15 솔로랭크 판수 (자유랭크 / 노말 제외)
 }
 
 const USER_AGENT =
@@ -29,14 +26,6 @@ const VALID_TIERS = new Set([
   "CHALLENGER",
 ]);
 const VALID_RANKS = new Set(["I", "II", "III", "IV"]);
-
-// S15(2025) 시즌 범위 (KST 기준)
-// 시작: 2025-01-08, 종료: 2025-12-31 (S16은 2026 시작)
-const S15_START = new Date("2025-01-08T00:00:00+09:00");
-const S15_END = new Date("2026-01-01T00:00:00+09:00");
-
-// 안전장치: 최대 페이지 수 (한 페이지 ~30판이라 12 = 360판까지 커버)
-const MAX_PAGES = 12;
 
 function fetchHtml(url: string): Promise<string | null> {
   return fetch(url, {
@@ -77,117 +66,8 @@ function parsePeakFromHtml(
   return empty;
 }
 
-function extractSid(html: string): string | null {
-  const m = html.match(/sid=(\d+)/);
-  return m?.[1] ?? null;
-}
-
-interface ParsedGame {
-  date: Date;
-  isRemake: boolean; // 다시하기 (remake) — 솔로랭크 통계에서 제외해야 함
-}
-
 /**
- * 페이지 HTML을 게임 카드 단위로 분리해 각 카드의 날짜와 다시하기 여부 파싱.
- * 각 게임 카드 끝에는 `showGameDetailBtn ... data-game-id="..."` 가 있어
- * 이 패턴 기준으로 카드를 split.
- */
-function parseGames(html: string): ParsedGame[] {
-  const games: ParsedGame[] = [];
-  const re = /showGameDetailBtn[^<]*?data-game-id=["']\d+["']/g;
-  let prevPos = 0;
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    const card = html.substring(prevPos, m.index + m[0].length);
-    prevPos = m.index + m[0].length;
-    const dateM = card.match(
-      /tipsy='(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/
-    );
-    if (!dateM) continue;
-    const y = parseInt(dateM[1], 10);
-    const mo = parseInt(dateM[2], 10);
-    const d = parseInt(dateM[3], 10);
-    if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d))
-      continue;
-    games.push({
-      date: new Date(y, mo - 1, d),
-      isRemake: card.includes("다시하기"),
-    });
-  }
-  return games;
-}
-
-/**
- * 솔로랭크 게임 목록을 페이지네이션해 S15 범위 판수 카운트.
- * fow는 한 페이지 ~30판, get_more_games의 data-ts로 다음 cursor 제공.
- */
-async function countS15SoloGames(sid: string): Promise<number | null> {
-  let ts: string | null = null;
-  let s15Count = 0;
-  let pageCount = 0;
-
-  while (pageCount < MAX_PAGES) {
-    const url = `https://www.fow.lol/api/games?type=solo&region=kr&sid=${sid}&champ=0${ts ? `&ts=${ts}` : ""}`;
-    const html = await fetchHtml(url);
-    if (!html) {
-      // 한 번도 못 가져왔으면 null, 일부 가져왔으면 그 값 반환
-      return pageCount === 0 ? null : s15Count;
-    }
-    pageCount++;
-
-    const games = parseGames(html);
-    if (games.length === 0) break;
-
-    // S15 범위 + 다시하기 제외 카운트
-    for (const g of games) {
-      if (g.date >= S15_START && g.date < S15_END && !g.isRemake) s15Count++;
-    }
-
-    // 가장 오래된 게임이 S15 이전이면 중단
-    const oldest = games[games.length - 1].date;
-    if (oldest < S15_START) break;
-
-    // 다음 페이지 cursor
-    const tsMatch = html.match(
-      /get_more_games[^>]*data-ts=['"](\d+)['"]/
-    );
-    if (!tsMatch) break;
-    const newTs = tsMatch[1];
-    if (newTs === ts) break; // 동일 cursor면 무한 루프 방지
-    ts = newTs;
-  }
-
-  return s15Count;
-}
-
-/**
- * S15 peak + 솔로랭크 판수 조회.
- * 메인 페이지 1회 + 게임 목록 페이지네이션 (보통 1~5회).
- */
-export async function fetchS15SummaryFromFow(
-  gameName: string,
-  tagLine: string
-): Promise<FowSummary> {
-  const url = `https://www.fow.lol/find/kr/${encodeURIComponent(gameName)}-${encodeURIComponent(tagLine)}`;
-  const html = await fetchHtml(url);
-  if (!html) {
-    return {
-      peak: { tier: null, rank: null, lp: null },
-      gamesS15: null,
-    };
-  }
-
-  const peak = parsePeakFromHtml(html, "S15");
-  const sid = extractSid(html);
-  let gamesS15: number | null = null;
-  if (sid) {
-    gamesS15 = await countS15SoloGames(sid);
-  }
-  return { peak, gamesS15 };
-}
-
-/**
- * 호환용 — peak만.
+ * S15 peak를 fow에서 가져옴. 색인 안 된 소환사면 모두 null.
  */
 export async function fetchPeakFromFow(
   gameName: string,

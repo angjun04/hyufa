@@ -134,3 +134,43 @@ export async function verifyAccount(
 ): Promise<RiotAccount | null> {
   return getAccountByRiotId(gameName, tagLine);
 }
+
+// S15 (2025) 시즌 epoch 범위 (KST)
+// 라이엇 공식 시작: 2025-01-08, 종료: 2025-12-31 (S16은 2026-01부터)
+const S15_START_SEC = Math.floor(
+  new Date("2025-01-08T00:00:00+09:00").getTime() / 1000
+);
+const S15_END_SEC = Math.floor(
+  new Date("2026-01-01T00:00:00+09:00").getTime() / 1000
+);
+
+/**
+ * match-v5 ids 페이지네이션으로 S15 솔로랭크(queue=420) 판수 카운트.
+ * 한 호출당 최대 100개. 보통 학생은 50~300판이라 1~3 호출.
+ * fow와 달리 라이엇 API는 다시하기(remake) 게임도 별도 게임으로 카운트하지만,
+ * match id가 부여된 모든 게임이 정식으로 시작된 것이므로 사용자 인식 판수와
+ * 보통 일치한다.
+ */
+export async function countS15SoloGames(puuid: string): Promise<number | null> {
+  let total = 0;
+  let start = 0;
+  const PAGE = 100;
+  const MAX_PAGES = 6; // 600판까지 안전 한도
+
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const url =
+      `https://asia.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids` +
+      `?queue=420&startTime=${S15_START_SEC}&endTime=${S15_END_SEC}` +
+      `&start=${start}&count=${PAGE}`;
+    const res = await riotFetch(url);
+    if (!res.ok) {
+      // 한 번도 못 가져왔으면 null
+      return i === 0 ? null : total;
+    }
+    const ids: string[] = await res.json();
+    total += ids.length;
+    if (ids.length < PAGE) return total; // 마지막 페이지
+    start += PAGE;
+  }
+  return total; // 600+ (한도 도달, 어차피 패널티 없음)
+}
