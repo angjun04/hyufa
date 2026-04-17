@@ -31,7 +31,6 @@ export async function GET() {
       preferredPositions: true,
       bio: true,
       isLookingForTeam: true,
-      isAdmin: true,
     },
   });
   if (!user) {
@@ -62,7 +61,6 @@ export async function GET() {
     preferredPositions: user.preferredPositions,
     bio: user.bio,
     isLookingForTeam: user.isLookingForTeam,
-    isAdmin: user.isAdmin,
   });
 }
 

@@ -35,6 +35,17 @@ export async function POST(req: Request) {
       );
     }
 
+    // 슈퍼어드민 아이디와 충돌 방지
+    if (
+      process.env.ADMIN_USERNAME &&
+      username === process.env.ADMIN_USERNAME
+    ) {
+      return NextResponse.json(
+        { error: "사용할 수 없는 아이디입니다." },
+        { status: 400 }
+      );
+    }
+
     if (typeof password !== "string" || password.length < 6) {
       return NextResponse.json(
         { error: "비밀번호는 6자 이상이어야 합니다." },

@@ -161,14 +161,6 @@ export default function MyPage() {
             </h1>
             <p className="text-[12px] text-[#6c727f] mt-0.5">
               @{profile.username}
-              {profile.isAdmin && (
-                <Link
-                  href="/admin"
-                  className="ml-2 text-[#a070d6] hover:underline"
-                >
-                  · 어드민
-                </Link>
-              )}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1.5">

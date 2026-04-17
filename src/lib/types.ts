@@ -24,7 +24,6 @@ export interface UserProfile {
   preferredPositions: string[];
   bio: string | null;
   isLookingForTeam?: boolean;
-  isAdmin?: boolean;
   createdAt?: string;
 }
 

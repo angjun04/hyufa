@@ -19,7 +19,6 @@ export async function GET() {
       tagLine: true,
       puuid: true,
       phoneNumber: true,
-      isAdmin: true,
       peakTierS15: true,
       peakRankS15: true,
       peakTierS16Locked: true,
@@ -51,7 +50,6 @@ export async function GET() {
         gameName: u.gameName,
         tagLine: u.tagLine,
         phoneNumber: u.phoneNumber,
-        isAdmin: u.isAdmin,
         currentTier: c?.currentTier ?? null,
         currentRank: c?.currentRank ?? null,
         peakTierS16: u.peakLockedAt
