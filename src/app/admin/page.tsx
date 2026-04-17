@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { formatTier } from "@/lib/tierScore";
 
 interface AdminSettings {
@@ -16,7 +17,6 @@ interface AdminUser {
   gameName: string;
   tagLine: string;
   phoneNumber: string;
-  isAdmin: boolean;
   currentTier: string | null;
   currentRank: string | null;
   peakTierS16: string | null;
@@ -145,6 +145,20 @@ export default function AdminPage() {
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <h1 className="text-2xl font-bold text-white">어드민</h1>
 
+      {/* 대회 관리 바로가기 */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-white">대회 관리</h2>
+          <p className="text-xs text-gray-400">팀/대진표/세트별 픽밴 입력</p>
+        </div>
+        <Link
+          href="/admin/tournaments"
+          className="bg-[#e08a3c] hover:bg-[#f09a48] text-black text-sm font-semibold px-3 py-1.5 rounded"
+        >
+          대회 페이지 →
+        </Link>
+      </div>
+
       {message && (
         <div className="bg-blue-500/20 border border-blue-500/50 text-blue-200 text-sm p-3 rounded-lg">
           {message}
@@ -231,12 +245,7 @@ export default function AdminPage() {
             <tbody className="text-gray-200">
               {users.map((u) => (
                 <tr key={u.id} className="border-b border-gray-800">
-                  <td className="py-2 px-2">
-                    {u.username}
-                    {u.isAdmin && (
-                      <span className="ml-1 text-xs text-purple-400">★</span>
-                    )}
-                  </td>
+                  <td className="py-2 px-2">{u.username}</td>
                   <td className="py-2 px-2 text-gray-400">
                     {u.gameName}#{u.tagLine}
                   </td>

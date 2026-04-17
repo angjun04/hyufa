@@ -4,17 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
+import { SUPERADMIN_ID } from "@/lib/adminConst";
 
 const NAV_ITEMS = [
   { href: "/", label: "점수 계산기" },
   { href: "/fa", label: "FA 마켓" },
   { href: "/recruit", label: "팀 모집" },
+  { href: "/tournaments", label: "대회" },
 ];
 
 export default function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const isSuperAdmin = session?.user?.id === SUPERADMIN_ID;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname?.startsWith(href);
@@ -55,16 +58,29 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-2">
             {session?.user ? (
               <>
-                <Link
-                  href="/mypage"
-                  className={`px-3 py-1.5 text-[13px] font-medium transition ${
-                    isActive("/mypage")
-                      ? "text-white"
-                      : "text-[#a3a8b3] hover:text-white"
-                  }`}
-                >
-                  {session.user.name ?? "마이페이지"}
-                </Link>
+                {isSuperAdmin ? (
+                  <Link
+                    href="/admin"
+                    className={`px-3 py-1.5 text-[13px] font-medium transition ${
+                      isActive("/admin")
+                        ? "text-[#e08a3c]"
+                        : "text-[#a070d6] hover:text-white"
+                    }`}
+                  >
+                    어드민
+                  </Link>
+                ) : (
+                  <Link
+                    href="/mypage"
+                    className={`px-3 py-1.5 text-[13px] font-medium transition ${
+                      isActive("/mypage")
+                        ? "text-white"
+                        : "text-[#a3a8b3] hover:text-white"
+                    }`}
+                  >
+                    {session.user.name ?? "마이페이지"}
+                  </Link>
+                )}
                 <button
                   onClick={() => signOut()}
                   className="text-[12px] text-[#6c727f] hover:text-[#e3603f] transition px-2"
@@ -124,13 +140,23 @@ export default function Navbar() {
             <div className="pt-2 border-t border-[#232830] space-y-1">
               {session?.user ? (
                 <>
-                  <Link
-                    href="/mypage"
-                    onClick={() => setOpen(false)}
-                    className="block py-2 text-sm text-white"
-                  >
-                    {session.user.name}
-                  </Link>
+                  {isSuperAdmin ? (
+                    <Link
+                      href="/admin"
+                      onClick={() => setOpen(false)}
+                      className="block py-2 text-sm text-[#a070d6]"
+                    >
+                      어드민
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/mypage"
+                      onClick={() => setOpen(false)}
+                      className="block py-2 text-sm text-white"
+                    >
+                      {session.user.name}
+                    </Link>
+                  )}
                   <button
                     onClick={() => signOut()}
                     className="block py-2 text-sm text-[#6c727f]"

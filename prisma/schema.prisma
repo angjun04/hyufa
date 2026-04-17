@@ -34,7 +34,6 @@ model User {
   preferredPositions String[] @default([])
   bio                String?
   isLookingForTeam   Boolean  @default(false)
-  isAdmin            Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -43,6 +42,7 @@ model User {
   sentContacts     ContactRequest[] @relation("SentContacts")
   receivedContacts ContactRequest[] @relation("ReceivedContacts")
   messages         Message[]
+  teamMemberships  TeamMember[]
 
   @@unique([gameName, tagLine])
 }
@@ -121,4 +121,128 @@ model Message {
   sender    User           @relation(fields: [senderId], references: [id], onDelete: Cascade)
   content   String
   createdAt DateTime       @default(now())
+}
+
+// ===== 대회 (Tournament) / 팀 / 대진표 =====
+// 구인글과 독립. 어드민(env 슈퍼계정)이 수기 입력.
+
+model Tournament {
+  id          String    @id @default(cuid())
+  slug        String    @unique // URL용
+  name        String
+  season      String? // 예: "S16-봄" "2026 가을"
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String    @default("draft") // draft | upcoming | ongoing | completed
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  teams   Team[]
+  matches Match[]
+}
+
+model Team {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  name         String
+  tag          String? // 짧은 태그/약어
+  logoUrl      String?
+  description  String?
+  seed         Int? // 대진표 시드
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  members    TeamMember[]
+  matchesAsA Match[]      @relation("MatchTeamA")
+  matchesAsB Match[]      @relation("MatchTeamB")
+  matchesWon Match[]      @relation("MatchWinner")
+
+  @@unique([tournamentId, name])
+}
+
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  // 회원이면 연결, 비회원이면 null
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // 라이엇 정보 (회원/비회원 모두 저장 — 표시/캐시 조회용)
+  gameName String
+  tagLine  String
+  puuid    String?
+
+  position  String? // TOP / JUNGLE / MID / ADC / SUPPORT
+  role      String? // MAIN / SUB 등
+  isCaptain Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamId, gameName, tagLine])
+  @@index([puuid])
+}
+
+model Match {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  round       String // "16강" / "8강" / "결승" 등 자유 입력
+  roundOrder  Int // 라운드 정렬용 (1 = 가장 이른 라운드)
+  matchOrder  Int // 라운드 내 순서 (1,2,3…)
+
+  teamAId      String?
+  teamA        Team?   @relation("MatchTeamA", fields: [teamAId], references: [id], onDelete: SetNull)
+  teamBId      String?
+  teamB        Team?   @relation("MatchTeamB", fields: [teamBId], references: [id], onDelete: SetNull)
+  winnerTeamId String?
+  winnerTeam   Team?   @relation("MatchWinner", fields: [winnerTeamId], references: [id], onDelete: SetNull)
+
+  bestOf      Int       @default(1) // 1, 3, 5
+  scoreA      Int       @default(0)
+  scoreB      Int       @default(0)
+  scheduledAt DateTime?
+  vodUrl      String? // 중계 VOD (nullable)
+  note        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  games MatchGame[]
+
+  @@index([tournamentId, roundOrder, matchOrder])
+}
+
+// 세트(게임) 단위 — 픽/밴 기록
+model MatchGame {
+  id         String @id @default(cuid())
+  matchId    String
+  match      Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  gameNumber Int // 1, 2, 3…
+
+  blueTeamId String?
+  redTeamId  String?
+  winnerSide String? // "blue" | "red"
+
+  // 챔피언 이름 배열 (자유 문자열)
+  blueBans String[] @default([])
+  redBans  String[] @default([])
+
+  // 픽: [{position, champion, memberId?, displayName?}]
+  // JSON으로 수기 편집 편하게 — position은 TOP/JUNGLE/MID/ADC/SUPPORT 중 하나
+  bluePicks Json?
+  redPicks  Json?
+
+  durationSec Int?
+  note        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([matchId, gameNumber])
 }
