@@ -87,6 +87,11 @@ export async function GET() {
           tagLine: c.tagLine,
           currentTier: c.currentTier,
           currentRank: c.currentRank,
+          currentLP: c.currentLP,
+          peakTierS16: c.peakTierS16,
+          peakRankS16: c.peakRankS16,
+          peakTierS15: c.peakTierS15,
+          peakRankS15: c.peakRankS15,
         };
       })
       .filter(Boolean);

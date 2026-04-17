@@ -43,6 +43,11 @@ export interface TeamMemberInfo {
   tagLine: string;
   currentTier: string | null;
   currentRank: string | null;
+  currentLP: number | null;
+  peakTierS16: string | null;
+  peakRankS16: string | null;
+  peakTierS15: string | null;
+  peakRankS15: string | null;
 }
 
 export interface TeamPostData {

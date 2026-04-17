@@ -48,17 +48,53 @@ export default function TeamCard({
           <p className="text-[10px] uppercase tracking-wider text-[#6c727f] mb-1.5">
             현재 팀원
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {post.members.map((m) => (
               <div
                 key={m.puuid}
-                className="flex items-center gap-1.5 bg-[#0b0d11] border border-[#232830] rounded px-2 py-1 text-[12px] text-[#cdd1d8]"
+                className="bg-[#0b0d11] border border-[#232830] rounded px-2 py-1.5"
               >
-                <span>
+                <p className="text-[12px] text-[#cdd1d8] truncate">
                   {m.gameName}
                   <span className="text-[#6c727f]">#{m.tagLine}</span>
-                </span>
-                <TierBadge tier={m.currentTier} rank={m.currentRank} size="xs" />
+                </p>
+                <div className="mt-1 space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] uppercase tracking-wider text-[#6c727f]">
+                      S16 현재
+                    </span>
+                    <TierBadge
+                      tier={m.currentTier}
+                      rank={m.currentRank}
+                      lp={m.currentLP}
+                      size="xs"
+                    />
+                  </div>
+                  {m.peakTierS16 && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] uppercase tracking-wider text-[#6c727f]">
+                        S16 최고
+                      </span>
+                      <TierBadge
+                        tier={m.peakTierS16}
+                        rank={m.peakRankS16}
+                        size="xs"
+                      />
+                    </div>
+                  )}
+                  {m.peakTierS15 && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] uppercase tracking-wider text-[#6c727f]">
+                        S15 최고
+                      </span>
+                      <TierBadge
+                        tier={m.peakTierS15}
+                        rank={m.peakRankS15}
+                        size="xs"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
