@@ -8,14 +8,19 @@ interface TeamCardProps {
   post: TeamPostData;
   currentUserId?: string;
   onApply?: (postId: string, toUserId: string) => void;
+  onEdit?: (post: TeamPostData) => void;
+  onDelete?: (postId: string) => void;
 }
 
 export default function TeamCard({
   post,
   currentUserId,
   onApply,
+  onEdit,
+  onDelete,
 }: TeamCardProps) {
   const timeAgo = getTimeAgo(new Date(post.createdAt));
+  const isOwner = !!currentUserId && currentUserId === post.userId;
 
   return (
     <div className="bg-[#14171d] border border-[#232830] rounded-md p-4 hover:border-[#3a414c] transition">
@@ -37,6 +42,28 @@ export default function TeamCard({
       <p className="text-[13px] text-[#cdd1d8] mb-3 whitespace-pre-wrap leading-relaxed">
         {post.description}
       </p>
+
+      {post.members.length > 0 && (
+        <div className="mb-3">
+          <p className="text-[10px] uppercase tracking-wider text-[#6c727f] mb-1.5">
+            현재 팀원
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {post.members.map((m) => (
+              <div
+                key={m.puuid}
+                className="flex items-center gap-1.5 bg-[#0b0d11] border border-[#232830] rounded px-2 py-1 text-[12px] text-[#cdd1d8]"
+              >
+                <span>
+                  {m.gameName}
+                  <span className="text-[#6c727f]">#{m.tagLine}</span>
+                </span>
+                <TierBadge tier={m.currentTier} rank={m.currentRank} size="xs" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {post.positions.length > 0 && (
         <div className="mb-3 flex items-center gap-2 flex-wrap">
@@ -60,7 +87,28 @@ export default function TeamCard({
         </p>
       )}
 
-      {onApply && currentUserId && currentUserId !== post.userId && (
+      {isOwner && (onEdit || onDelete) && (
+        <div className="flex gap-1.5">
+          {onEdit && (
+            <button
+              onClick={() => onEdit(post)}
+              className="flex-1 bg-[#1a1e25] hover:bg-[#232830] border border-[#232830] hover:border-[#e08a3c] text-white text-[12px] py-1.5 rounded font-medium transition"
+            >
+              수정
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => onDelete(post.id)}
+              className="flex-1 bg-[#1a1e25] hover:bg-[#2a1a1a] border border-[#232830] hover:border-[#c14545] text-[#c14545] text-[12px] py-1.5 rounded font-medium transition"
+            >
+              삭제
+            </button>
+          )}
+        </div>
+      )}
+
+      {!isOwner && onApply && currentUserId && (
         <button
           onClick={() => onApply(post.id, post.userId)}
           className="w-full bg-[#1a1e25] hover:bg-[#232830] border border-[#232830] hover:border-[#e08a3c] text-white text-[12px] py-1.5 rounded font-medium transition"

@@ -6,18 +6,43 @@ import TeamCard from "@/components/TeamCard";
 import type { TeamPostData } from "@/lib/types";
 import { POSITIONS } from "@/lib/tierScore";
 
+interface MemberInput {
+  gameName: string;
+  tagLine: string;
+}
+
+interface FormState {
+  title: string;
+  description: string;
+  positions: string[];
+  minTier: string;
+  maxTier: string;
+  members: MemberInput[];
+}
+
+const emptyForm: FormState = {
+  title: "",
+  description: "",
+  positions: [],
+  minTier: "",
+  maxTier: "",
+  members: [],
+};
+
 export default function RecruitPage() {
   const { data: session } = useSession();
   const [posts, setPosts] = useState<TeamPostData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    positions: [] as string[],
-    minTier: "",
-    maxTier: "",
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [memberInput, setMemberInput] = useState("");
+
+  const refresh = async () => {
+    const refreshed = await fetch("/api/recruit").then((r) => r.json());
+    setPosts(refreshed);
+  };
 
   useEffect(() => {
     fetch("/api/recruit")
@@ -35,21 +60,98 @@ export default function RecruitPage() {
     }));
   };
 
+  const addMember = () => {
+    const raw = memberInput.trim();
+    if (!raw) return;
+    const [name, tag] = raw.split("#");
+    if (!name?.trim() || !tag?.trim()) {
+      alert("닉네임#태그 형식으로 입력해주세요. (예: Faker#KR1)");
+      return;
+    }
+    const gameName = name.trim();
+    const tagLine = tag.trim();
+    const exists = form.members.some(
+      (m) =>
+        m.gameName.toLowerCase() === gameName.toLowerCase() &&
+        m.tagLine.toLowerCase() === tagLine.toLowerCase()
+    );
+    if (exists) {
+      setMemberInput("");
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      members: [...prev.members, { gameName, tagLine }],
+    }));
+    setMemberInput("");
+  };
+
+  const removeMember = (idx: number) => {
+    setForm((prev) => ({
+      ...prev,
+      members: prev.members.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setMemberInput("");
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    resetForm();
+  };
+
+  const handleEdit = (post: TeamPostData) => {
+    setEditingId(post.id);
+    setForm({
+      title: post.title,
+      description: post.description,
+      positions: post.positions,
+      minTier: post.minTier ?? "",
+      maxTier: post.maxTier ?? "",
+      members: post.members.map((m) => ({
+        gameName: m.gameName,
+        tagLine: m.tagLine,
+      })),
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDelete = async (postId: string) => {
+    if (!confirm("모집글을 삭제하시겠습니까?")) return;
+    const res = await fetch(`/api/recruit/${postId}`, { method: "DELETE" });
+    if (res.ok) {
+      await refresh();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "삭제 중 오류가 발생했습니다.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/recruit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (res.ok) {
-      const refreshed = await fetch("/api/recruit").then((r) => r.json());
-      setPosts(refreshed);
-      setShowForm(false);
-      setForm({ title: "", description: "", positions: [], minTier: "", maxTier: "" });
-    } else {
-      const data = await res.json();
-      alert(data.error || "오류가 발생했습니다.");
+    setSubmitting(true);
+    try {
+      const url = editingId ? `/api/recruit/${editingId}` : "/api/recruit";
+      const method = editingId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        await refresh();
+        closeForm();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "오류가 발생했습니다.");
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -82,7 +184,10 @@ export default function RecruitPage() {
         </div>
         {session?.user && (
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              if (showForm) closeForm();
+              else setShowForm(true);
+            }}
             className="bg-[#e08a3c] hover:bg-[#f09a48] text-black text-[13px] px-3 py-1.5 rounded font-semibold transition"
           >
             {showForm ? "닫기" : "+ 글쓰기"}
@@ -95,6 +200,9 @@ export default function RecruitPage() {
           onSubmit={handleSubmit}
           className="bg-[#14171d] border border-[#232830] rounded-md p-4 mb-5 space-y-3"
         >
+          {editingId && (
+            <p className="text-[11px] text-[#e08a3c]">모집글 수정 중</p>
+          )}
           <input
             type="text"
             value={form.title}
@@ -132,12 +240,79 @@ export default function RecruitPage() {
               ))}
             </div>
           </div>
-          <button
-            type="submit"
-            className="bg-[#e08a3c] hover:bg-[#f09a48] text-black text-[13px] px-4 py-2 rounded font-semibold transition"
-          >
-            등록
-          </button>
+
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-[#6c727f] mb-1.5">
+              현재 팀원 (본인 제외)
+            </p>
+            {form.members.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {form.members.map((m, idx) => (
+                  <div
+                    key={`${m.gameName}#${m.tagLine}`}
+                    className="flex items-center gap-1.5 bg-[#0b0d11] border border-[#232830] rounded px-2 py-1 text-[12px] text-[#cdd1d8]"
+                  >
+                    <span>
+                      {m.gameName}
+                      <span className="text-[#6c727f]">#{m.tagLine}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeMember(idx)}
+                      className="text-[#6c727f] hover:text-[#c14545] text-[14px] leading-none"
+                      aria-label="삭제"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={memberInput}
+                onChange={(e) => setMemberInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addMember();
+                  }
+                }}
+                placeholder="닉네임#KR1"
+                className={`flex-1 ${inputCls}`}
+              />
+              <button
+                type="button"
+                onClick={addMember}
+                className="bg-[#1a1e25] hover:bg-[#232830] border border-[#232830] hover:border-[#e08a3c] text-white text-[12px] px-3 rounded font-medium transition"
+              >
+                추가
+              </button>
+            </div>
+            <p className="text-[10px] text-[#6c727f] mt-1">
+              등록 시 존재하지 않는 계정은 자동으로 제외됩니다.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="bg-[#e08a3c] hover:bg-[#f09a48] disabled:opacity-50 text-black text-[13px] px-4 py-2 rounded font-semibold transition"
+            >
+              {submitting ? "저장 중..." : editingId ? "수정 완료" : "등록"}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={closeForm}
+                className="bg-[#1a1e25] hover:bg-[#232830] border border-[#232830] text-[#a3a8b3] text-[13px] px-4 py-2 rounded font-medium transition"
+              >
+                취소
+              </button>
+            )}
+          </div>
         </form>
       )}
 
@@ -155,6 +330,8 @@ export default function RecruitPage() {
               post={post}
               currentUserId={session?.user?.id}
               onApply={handleApply}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
           ))}
         </div>

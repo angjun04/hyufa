@@ -37,6 +37,14 @@ export interface PublicPlayerInfo {
   preferredPositions: string[];
 }
 
+export interface TeamMemberInfo {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  currentTier: string | null;
+  currentRank: string | null;
+}
+
 export interface TeamPostData {
   id: string;
   userId: string;
@@ -46,6 +54,7 @@ export interface TeamPostData {
   positions: string[];
   maxTier: string | null;
   minTier: string | null;
+  members: TeamMemberInfo[];
   createdAt: string;
 }
 
