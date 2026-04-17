@@ -123,10 +123,11 @@ export default function RecruitPage() {
 
   const handleDelete = async (postId: string) => {
     if (!confirm("모집글을 삭제하시겠습니까?")) return;
+    const prev = posts;
+    setPosts((cur) => cur.filter((p) => p.id !== postId));
     const res = await fetch(`/api/recruit/${postId}`, { method: "DELETE" });
-    if (res.ok) {
-      await refresh();
-    } else {
+    if (!res.ok) {
+      setPosts(prev);
       const data = await res.json().catch(() => ({}));
       alert(data.error || "삭제 중 오류가 발생했습니다.");
     }
